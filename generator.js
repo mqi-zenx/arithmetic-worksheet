@@ -32,6 +32,13 @@ function generateDivision(min, max) {
   return { operandA: dividend, operandB: b, operator: '÷', answer: a };
 }
 
+function generateLongDivision() {
+  // 1-digit divisor, 2-digit quotient → multi-digit dividend
+  const divisor = randomInt(2, 9);
+  const quotient = randomInt(11, 99);
+  return { operandA: divisor * quotient, operandB: divisor, operator: 'LD', answer: quotient };
+}
+
 function isDuplicate(problem, existing) {
   return existing.some(
     p =>
@@ -48,6 +55,7 @@ function generateOne(operations, min, max) {
     case '-': return generateSubtraction(min, max);
     case '×': return generateMultiplication(min, max);
     case '÷': return generateDivision(min, max);
+    case 'LD': return generateLongDivision();
   }
 }
 
