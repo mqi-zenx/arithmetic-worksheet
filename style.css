@@ -285,6 +285,42 @@ button {
 }
 
 /* ============================
+   Long Division Layout
+   ============================ */
+.ld-problem {
+  align-items: flex-start;
+}
+
+.ld-layout {
+  display: inline-flex;
+  flex-direction: column;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+}
+
+.ld-answer-space {
+  height: 28px;
+  border-bottom: 1px solid #aaa;
+  /* stretches to width of .ld-bottom via column flex */
+}
+
+.ld-bottom {
+  display: flex;
+  align-items: center;
+}
+
+.ld-divisor {
+  padding-right: 3px;
+  padding-bottom: 4px;
+}
+
+.ld-box {
+  border-top: 2px solid #222;
+  border-left: 2px solid #222;
+  padding: 4px 10px 4px 6px;
+}
+
+/* ============================
    Print Styles
    ============================ */
 @media print {
