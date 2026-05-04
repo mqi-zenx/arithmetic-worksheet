@@ -1,103 +1,130 @@
-/**
- * app.js — UI controller: wires config form to generator, renders worksheet.
- */
+// app.js — Curriculum browser and worksheet renderer
 
-const PRESETS = {
-  easy:   { min: 1,  max: 10 },
-  medium: { min: 1,  max: 12 },
-  hard:   { min: 5,  max: 20 },
-};
+const yearTabsEl     = document.getElementById('year-tabs');
+const topicListEl    = document.getElementById('topic-list');
+const sidebarCtrls   = document.getElementById('sidebar-controls');
+const countInput     = document.getElementById('count-input');
+const generateBtn    = document.getElementById('btn-generate');
+const printBtn       = document.getElementById('btn-print');
+const errorMsg       = document.getElementById('error-msg');
+const worksheetEl    = document.getElementById('worksheet');
 
-const OP_LABELS = { '+': 'Addition', '-': 'Subtraction', '×': 'Multiplication', '÷': 'Division', 'LD': 'Long Division' };
+let activeYear  = null;
+let activeTopic = null;
 
-// DOM refs
-const form          = document.getElementById('config-form');
-const difficultyEl  = document.getElementById('difficulty');
-const customRange   = document.getElementById('custom-range');
-const minInput      = document.getElementById('min-operand');
-const maxInput      = document.getElementById('max-operand');
-const countInput    = document.getElementById('count');
-const generateBtn   = document.getElementById('btn-generate');
-const printBtn      = document.getElementById('btn-print');
-const errorMsg      = document.getElementById('error-msg');
-const worksheet     = document.getElementById('worksheet');
+// ── Build year tabs ───────────────────────────────────────────
 
-// Show/hide custom range inputs based on difficulty preset
-difficultyEl.addEventListener('change', () => {
-  const preset = PRESETS[difficultyEl.value];
-  if (preset) {
-    minInput.value = preset.min;
-    maxInput.value = preset.max;
-    customRange.classList.add('hidden');
-  } else {
-    customRange.classList.remove('hidden');
-  }
+CURRICULUM.forEach(year => {
+  const btn = document.createElement('button');
+  btn.className = 'year-tab';
+  btn.textContent = year.label;
+  btn.dataset.yearId = year.id;
+  btn.style.setProperty('--year-color', year.color);
+  btn.addEventListener('click', () => selectYear(year));
+  yearTabsEl.appendChild(btn);
 });
 
-generateBtn.addEventListener('click', () => {
+function selectYear(year) {
+  activeYear = year;
+  activeTopic = null;
+  sidebarCtrls.style.display = 'none';
   errorMsg.textContent = '';
 
-  // Read selected operations
-  const operations = ['op-add', 'op-sub', 'op-mul', 'op-div', 'op-ldiv']
-    .filter(id => document.getElementById(id).checked)
-    .map(id => ({ 'op-add': '+', 'op-sub': '-', 'op-mul': '×', 'op-div': '÷', 'op-ldiv': 'LD' }[id]));
+  document.querySelectorAll('.year-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.yearId === year.id);
+  });
 
-  if (operations.length === 0) {
-    errorMsg.textContent = 'Please select at least one operation.';
+  topicListEl.innerHTML = '';
+  year.topics.forEach(topic => {
+    const li = document.createElement('li');
+    li.className = 'topic-item';
+    li.textContent = topic.label;
+    li.dataset.topicId = topic.id;
+    li.style.setProperty('--year-color', year.color);
+    li.addEventListener('click', () => selectTopic(topic));
+    topicListEl.appendChild(li);
+  });
+}
+
+function selectTopic(topic) {
+  activeTopic = topic;
+  errorMsg.textContent = '';
+
+  document.querySelectorAll('.topic-item').forEach(li => {
+    li.classList.toggle('active', li.dataset.topicId === topic.id);
+  });
+
+  countInput.value = topic.defaultCount;
+  sidebarCtrls.style.display = '';
+  generateBtn.focus();
+}
+
+// ── Generate ──────────────────────────────────────────────────
+
+generateBtn.addEventListener('click', () => {
+  if (!activeTopic) return;
+  errorMsg.textContent = '';
+
+  const count = Math.min(Math.max(parseInt(countInput.value, 10) || activeTopic.defaultCount, 1), 60);
+  const problems = generateCurriculumProblems(activeTopic, count);
+
+  if (problems.length === 0) {
+    errorMsg.textContent = 'Could not generate problems. Please try again.';
     return;
   }
 
-  const min = parseInt(minInput.value, 10);
-  const max = parseInt(maxInput.value, 10);
-  const count = Math.min(Math.max(parseInt(countInput.value, 10) || 20, 1), 60);
-
-  if (isNaN(min) || isNaN(max) || min < 0 || max < 1 || min >= max) {
-    errorMsg.textContent = 'Please enter a valid number range (min must be less than max).';
-    return;
-  }
-
-  const problems = generateProblems({ operations, minOperand: min, maxOperand: max, count });
-  renderWorksheet(problems, operations);
+  renderWorksheet(activeTopic, problems);
   printBtn.disabled = false;
+  worksheetEl.scrollIntoView({ behavior: 'smooth' });
 });
 
-printBtn.addEventListener('click', () => {
-  window.print();
-});
+printBtn.addEventListener('click', () => window.print());
 
-function renderWorksheet(problems, operations) {
-  // Build title from selected operations
-  const opNames = operations.map(op => OP_LABELS[op]);
-  const title = opNames.length === Object.keys(OP_LABELS).length
-    ? 'Arithmetic Practice'
-    : opNames.join(' & ') + ' Practice';
+// ── Select first year on load ─────────────────────────────────
 
-  // Choose grid column count (long division needs more horizontal room)
-  const hasLD = operations.includes('LD');
-  let colClass = hasLD ? 'cols-2' : 'cols-4';
-  if (!hasLD && problems.length <= 10) colClass = 'cols-2';
-  else if (!hasLD && problems.length <= 18) colClass = 'cols-3';
+if (CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
 
-  const problemsHTML = problems.map((p, i) => {
-    if (p.operator === 'LD') {
-      return `
-        <div class="problem ld-problem">
-          <span class="problem-number">${i + 1}</span>
-          <div class="ld-layout">
-            <div class="ld-answer-space"></div>
-            <div class="ld-bottom">
-              <span class="ld-divisor">${p.operandB}</span>
-              <div class="ld-box">
-                <span class="ld-dividend">${p.operandA}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
+// ── Render worksheet ──────────────────────────────────────────
+
+function renderWorksheet(topic, problems) {
+  const yearLabel = CURRICULUM.find(y => y.topics.some(t => t.id === topic.id))?.label ?? '';
+  const title = `${yearLabel} — ${topic.label}`;
+
+  // Determine dominant layout
+  const hasColumn = problems.some(p => p.layout === 'column' || p.layout === 'longdivision');
+  const hasInline = problems.some(p => p.layout === 'inline');
+  const hasLD     = problems.some(p => p.layout === 'longdivision');
+
+  let gridClass;
+  if (hasColumn && !hasInline) {
+    gridClass = hasLD ? 'cols-2' : (problems.length <= 10 ? 'cols-2' : problems.length <= 18 ? 'cols-3' : 'cols-4');
+  } else {
+    gridClass = 'cols-2-inline';
+  }
+
+  const problemsHTML = problems.map((p, i) => renderProblem(p, i + 1)).join('');
+
+  worksheetEl.className = 'worksheet';
+  worksheetEl.innerHTML = `
+    <div class="worksheet-header">
+      <h1>${title}</h1>
+      <div class="student-info">
+        <span>Name:</span>
+        <span>Date:</span>
+        <span>Score: &nbsp;/ ${problems.length}</span>
+      </div>
+    </div>
+    <div class="problem-grid ${gridClass}">
+      ${problemsHTML}
+    </div>
+  `;
+}
+
+function renderProblem(p, num) {
+  if (p.layout === 'column') {
     return `
       <div class="problem">
-        <span class="problem-number">${i + 1}</span>
+        <span class="problem-number">${num}</span>
         <span class="operand-a">${p.operandA}</span>
         <div class="operand-b-row">
           <span class="operator">${p.operator}</span>
@@ -105,22 +132,32 @@ function renderWorksheet(problems, operations) {
         </div>
         <div class="problem-line"></div>
         <div class="problem-answer"></div>
-      </div>
-    `;
-  }).join('');
+      </div>`;
+  }
 
-  worksheet.className = 'worksheet';
-  worksheet.innerHTML = `
-    <div class="worksheet-header">
-      <h1>${title}</h1>
-      <div class="student-info">
-        <span>Name: &nbsp;</span>
-        <span>Date: &nbsp;</span>
-        <span>Score: &nbsp;&nbsp;&nbsp;/ ${problems.length}</span>
+  if (p.layout === 'longdivision') {
+    return `
+      <div class="problem ld-problem">
+        <span class="problem-number">${num}</span>
+        <div class="ld-layout">
+          <div class="ld-answer-space"></div>
+          <div class="ld-bottom">
+            <span class="ld-divisor">${p.operandB}</span>
+            <div class="ld-box">
+              <span class="ld-dividend">${p.operandA}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // inline
+  return `
+    <div class="problem inline-problem">
+      <span class="problem-number">${num}</span>
+      <div class="inline-body">
+        ${p.html}
+        <div class="prob-answer-line"></div>
       </div>
-    </div>
-    <div class="problem-grid ${colClass}">
-      ${problemsHTML}
-    </div>
-  `;
+    </div>`;
 }
