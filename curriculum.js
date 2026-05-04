@@ -238,6 +238,13 @@ const CURRICULUM = [
         config: { level: 2 },
         defaultCount: 16,
       },
+      {
+        id: 'y3_triangles',
+        label: 'Types of Triangles',
+        type: 'triangleClassify',
+        config: {},
+        defaultCount: 20,
+      },
     ],
   },
 
@@ -349,6 +356,13 @@ const CURRICULUM = [
         label: 'Naming Angles',
         type: 'angles',
         config: { mode: 'name' },
+        defaultCount: 20,
+      },
+      {
+        id: 'y4_quadrilaterals',
+        label: 'Quadrilateral Properties',
+        type: 'quadrilateralProperties',
+        config: {},
         defaultCount: 20,
       },
     ],
@@ -533,6 +547,20 @@ const CURRICULUM = [
         label: 'Area of Triangles',
         type: 'area',
         config: { shape: 'triangle', minSide: 2, maxSide: 15 },
+        defaultCount: 15,
+      },
+      {
+        id: 'y6_area_parallelogram',
+        label: 'Area of Parallelograms',
+        type: 'area',
+        config: { shape: 'parallelogram', minSide: 2, maxSide: 15 },
+        defaultCount: 15,
+      },
+      {
+        id: 'y6_area_trapezium',
+        label: 'Area of Trapeziums',
+        type: 'area',
+        config: { shape: 'trapezium', minSide: 2, maxSide: 12 },
         defaultCount: 15,
       },
       {

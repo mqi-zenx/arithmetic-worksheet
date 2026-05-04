@@ -419,14 +419,34 @@ function genArea(config) {
       answer: `${l * w} cm²`,
     };
   }
-  // triangle — use even base to guarantee integer area
-  const b = randomInt(minSide, maxSide) * 2;
-  const h = randomInt(minSide, maxSide);
-  return {
-    layout: 'inline',
-    html: `<span class="prob-text">Area of triangle: base = ${b} cm, height = ${h} cm</span>`,
-    answer: `${(b * h) / 2} cm²`,
-  };
+  if (shape === 'triangle') {
+    const b = randomInt(minSide, maxSide) * 2;
+    const h = randomInt(minSide, maxSide);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of triangle: base = ${b} cm, height = ${h} cm</span>`,
+      answer: `${(b * h) / 2} cm²`,
+    };
+  }
+  if (shape === 'parallelogram') {
+    const b = randomInt(minSide, maxSide);
+    const h = randomInt(minSide, maxSide);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of parallelogram: base = ${b} cm, height = ${h} cm</span>`,
+      answer: `${b * h} cm²`,
+    };
+  }
+  if (shape === 'trapezium') {
+    const a = randomInt(minSide, maxSide);
+    const b = randomInt(minSide, maxSide);
+    const h = randomInt(minSide, maxSide) * 2; // even height for integer area
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of trapezium: parallel sides = ${a} cm and ${b} cm, height = ${h} cm</span>`,
+      answer: `${((a + b) * h) / 2} cm²`,
+    };
+  }
 }
 
 // ── Perimeter ─────────────────────────────────────────────────
@@ -807,6 +827,52 @@ function genCoordinates(config) {
   };
 }
 
+// ── Triangle Classification ───────────────────────────────────
+
+function genTriangleClassify() {
+  const questions = [
+    { html: 'A triangle with 3 equal sides is called an ___ triangle.', answer: 'equilateral' },
+    { html: 'A triangle with 2 equal sides is called an ___ triangle.', answer: 'isosceles' },
+    { html: 'A triangle with no equal sides is called a ___ triangle.', answer: 'scalene' },
+    { html: 'A triangle with one 90° angle is called a ___ triangle.', answer: 'right-angled' },
+    { html: 'An equilateral triangle has ___ lines of symmetry.', answer: '3' },
+    { html: 'An isosceles triangle has ___ line(s) of symmetry.', answer: '1' },
+    { html: 'A scalene triangle has ___ lines of symmetry.', answer: '0' },
+    { html: 'Each angle in an equilateral triangle measures ___°.', answer: '60' },
+    { html: 'The three interior angles of any triangle add up to ___°.', answer: '180' },
+    { html: 'A triangle with angles 60°, 60° and 60° is called an ___ triangle.', answer: 'equilateral' },
+    { html: 'A triangle with one angle greater than 90° is called an ___ triangle.', answer: 'obtuse' },
+    { html: 'A triangle with all angles less than 90° is called an ___ triangle.', answer: 'acute' },
+    { html: 'A right-angled isosceles triangle has two angles each measuring ___°.', answer: '45' },
+  ];
+  const q = randomChoice(questions);
+  return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+}
+
+// ── Quadrilateral Properties ──────────────────────────────────
+
+function genQuadrilateralProperties() {
+  const questions = [
+    { html: 'A quadrilateral with exactly 1 pair of parallel sides is called a ___.', answer: 'trapezium' },
+    { html: 'A quadrilateral with 2 pairs of parallel sides and all sides equal is called a ___.', answer: 'rhombus' },
+    { html: 'A quadrilateral with 2 pairs of parallel sides and all angles equal to 90° is called a ___.', answer: 'rectangle' },
+    { html: 'A quadrilateral with all sides equal and all angles 90° is called a ___.', answer: 'square' },
+    { html: 'A parallelogram has ___ pairs of parallel sides.', answer: '2' },
+    { html: 'A rhombus has ___ equal sides.', answer: '4' },
+    { html: 'True or False: A rhombus has 4 right angles.', answer: 'False' },
+    { html: 'True or False: A parallelogram has opposite sides that are equal in length.', answer: 'True' },
+    { html: 'True or False: A trapezium has 2 pairs of parallel sides.', answer: 'False' },
+    { html: 'True or False: Every square is also a rhombus.', answer: 'True' },
+    { html: 'True or False: Every rectangle is also a parallelogram.', answer: 'True' },
+    { html: 'A rhombus has ___ lines of symmetry.', answer: '2' },
+    { html: 'The angles inside any quadrilateral add up to ___°.', answer: '360' },
+    { html: 'A parallelogram has ___ lines of symmetry.', answer: '0' },
+    { html: 'Which shape has all sides equal but angles that are not 90°: square or rhombus?', answer: 'rhombus' },
+  ];
+  const q = randomChoice(questions);
+  return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+}
+
 // ── Dispatcher ────────────────────────────────────────────────
 
 function generateProblem(type, config) {
@@ -840,7 +906,9 @@ function generateProblem(type, config) {
     case 'statistics':          return genStatistics(config);
     case 'shapeProperties':     return genShapeProperties(config);
     case 'angles':              return genAngles(config);
-    case 'coordinates':         return genCoordinates(config);
+    case 'coordinates':             return genCoordinates(config);
+    case 'triangleClassify':        return genTriangleClassify();
+    case 'quadrilateralProperties': return genQuadrilateralProperties();
     default:
       return { layout: 'inline', html: '<span class="prob-text">Unknown problem type</span>', answer: '' };
   }
