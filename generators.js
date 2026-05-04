@@ -1,0 +1,927 @@
+// generators.js — All problem generators for the K–6 curriculum
+
+// ── Utilities ─────────────────────────────────────────────────
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomChoice(arr) {
+  return arr[randomInt(0, arr.length - 1)];
+}
+
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function lcm(a, b) { return (a * b) / gcd(a, b); }
+
+function simplifyFraction(n, d) {
+  const g = gcd(Math.abs(n), Math.abs(d));
+  return [n / g, d / g];
+}
+
+function fractionToString(n, d) {
+  if (d === 1) return String(n);
+  if (n >= d) {
+    const whole = Math.floor(n / d);
+    const rem = n % d;
+    if (rem === 0) return String(whole);
+    const [sn, sd] = simplifyFraction(rem, d);
+    return `${whole} <sup>${sn}</sup>/<sub>${sd}</sub>`;
+  }
+  return `<sup>${n}</sup>/<sub>${d}</sub>`;
+}
+
+function frac(n, d) {
+  return `<sup>${n}</sup>/<sub>${d}</sub>`;
+}
+
+// ── Arithmetic ────────────────────────────────────────────────
+
+function genArithmetic(config) {
+  const { operations, minOperand, maxOperand, minOperandA, maxOperandA, restrictTables } = config;
+  const op = randomChoice(operations);
+
+  if (op === 'LD') {
+    const divisor = randomInt(2, 9);
+    const quotient = randomInt(11, 99);
+    return { layout: 'longdivision', operandA: divisor * quotient, operandB: divisor, operator: 'LD', answer: String(quotient) };
+  }
+
+  if (op === '×' && restrictTables) {
+    const table = randomChoice(restrictTables);
+    const other = randomInt(minOperand, maxOperand);
+    return { layout: 'column', operandA: table, operandB: other, operator: '×', answer: String(table * other) };
+  }
+
+  if (op === '×' && minOperandA !== undefined) {
+    const a = randomInt(minOperandA, maxOperandA);
+    const b = randomInt(minOperand, maxOperand);
+    return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
+  }
+
+  if (op === '+') {
+    const a = randomInt(minOperand, maxOperand);
+    const b = randomInt(minOperand, maxOperand);
+    return { layout: 'column', operandA: a, operandB: b, operator: '+', answer: String(a + b) };
+  }
+
+  if (op === '-') {
+    const a = randomInt(minOperand, maxOperand);
+    const b = randomInt(minOperand, a);
+    return { layout: 'column', operandA: a, operandB: b, operator: '−', answer: String(a - b) };
+  }
+
+  if (op === '×') {
+    const a = randomInt(minOperand, maxOperand);
+    const b = randomInt(minOperand, maxOperand);
+    return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
+  }
+
+  if (op === '÷') {
+    const a = randomInt(minOperand, maxOperand);
+    const b = randomInt(minOperand, maxOperand);
+    return { layout: 'column', operandA: a * b, operandB: b, operator: '÷', answer: String(a) };
+  }
+}
+
+// ── Sequences ─────────────────────────────────────────────────
+
+function genSequence(config) {
+  const { step, minStart, maxStart, length, mode = 'forward' } = config;
+  const start = randomInt(minStart, maxStart);
+  const seq = Array.from({ length: length + 1 }, (_, i) =>
+    mode === 'backward' ? start - i * step : start + i * step
+  );
+
+  const blankIdx = randomInt(1, length - 1);
+  const answer = seq[blankIdx];
+  const displayed = seq.map((n, i) => i === blankIdx ? '___' : String(n));
+
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${displayed.join(', ')}</span>`,
+    answer: String(answer),
+  };
+}
+
+// ── Number Bonds ──────────────────────────────────────────────
+
+function genNumberBonds(config) {
+  const { total } = config;
+  const a = randomInt(1, total - 1);
+  const b = total - a;
+
+  if (Math.random() > 0.5) {
+    return { layout: 'inline', html: `<span class="prob-text">${a} + ___ = ${total}</span>`, answer: String(b) };
+  }
+  return { layout: 'inline', html: `<span class="prob-text">___ + ${b} = ${total}</span>`, answer: String(a) };
+}
+
+// ── Place Value ───────────────────────────────────────────────
+
+function genPlaceValue(config) {
+  const { digits } = config;
+  const placeNames = ['ones', 'tens', 'hundreds', 'thousands', 'ten-thousands'];
+  const min = Math.pow(10, digits - 1);
+  const max = Math.pow(10, digits) - 1;
+  const num = randomInt(min, max);
+
+  const placeIdx = randomInt(0, digits - 1);
+  const placeName = placeNames[placeIdx];
+  const placeDigit = Math.floor(num / Math.pow(10, placeIdx)) % 10;
+  const placeValue = placeDigit * Math.pow(10, placeIdx);
+  const fmt = n => n.toLocaleString('en-AU');
+
+  const type = randomInt(0, 1);
+  if (type === 0) {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">What digit is in the <em>${placeName}</em> place of ${fmt(num)}?</span>`,
+      answer: String(placeDigit),
+    };
+  }
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">What is the value of the ${placeDigit} in ${fmt(num)}?</span>`,
+    answer: fmt(placeValue),
+  };
+}
+
+// ── Rounding ──────────────────────────────────────────────────
+
+function genRounding(config) {
+  const { minValue, maxValue, roundTo } = config;
+  const num = randomInt(minValue, maxValue);
+  const to = randomChoice(roundTo);
+  const rounded = Math.round(num / to) * to;
+  const toLabel = to.toLocaleString('en-AU');
+
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Round ${num.toLocaleString('en-AU')} to the nearest ${toLabel}:</span>`,
+    answer: rounded.toLocaleString('en-AU'),
+  };
+}
+
+// ── Fraction of a Group ───────────────────────────────────────
+
+function genFractionOfGroup(config) {
+  const { denominators, maxWhole } = config;
+  const denom = randomChoice(denominators);
+  const numer = randomInt(1, denom - 1);
+  const maxGroups = Math.floor(maxWhole / denom);
+  const groups = randomInt(1, Math.max(1, maxGroups));
+  const whole = groups * denom;
+  const answer = (numer * whole) / denom;
+
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Find ${frac(numer, denom)} of ${whole}:</span>`,
+    answer: String(answer),
+  };
+}
+
+// ── Money ─────────────────────────────────────────────────────
+
+function genMoney(config) {
+  const { maxAmount } = config;
+  const toAmt = cents => `$${(cents / 100).toFixed(2)}`;
+  const maxCents = maxAmount * 100;
+  const a = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
+  const b = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
+  const op = Math.random() > 0.5 ? '+' : '−';
+
+  if (op === '+') {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${toAmt(a)} + ${toAmt(b)} =</span>`,
+      answer: toAmt(a + b),
+    };
+  }
+  const big = Math.max(a, b), small = Math.min(a, b);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${toAmt(big)} − ${toAmt(small)} =</span>`,
+    answer: toAmt(big - small),
+  };
+}
+
+// ── Division with Remainders ──────────────────────────────────
+
+function genDivisionRemainder(config) {
+  const { minDivisor, maxDivisor, minDividend, maxDividend } = config;
+  const divisor = randomInt(minDivisor, maxDivisor);
+  const dividend = randomInt(minDividend, maxDividend);
+  const quotient = Math.floor(dividend / divisor);
+  const remainder = dividend % divisor;
+
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${dividend} ÷ ${divisor} =</span>`,
+    answer: remainder === 0 ? String(quotient) : `${quotient} r ${remainder}`,
+  };
+}
+
+// ── Equivalent Fractions ──────────────────────────────────────
+
+function genEquivFractions(config) {
+  const { maxDenom } = config;
+  const simpleNumer = randomInt(1, 4);
+  const simpleDenom = randomInt(simpleNumer + 1, 6);
+  const maxScale = Math.floor(maxDenom / simpleDenom);
+  if (maxScale < 2) return genEquivFractions(config);
+  const scale = randomInt(2, maxScale);
+
+  if (Math.random() > 0.5) {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${frac(simpleNumer, simpleDenom)} = ${frac('___', simpleDenom * scale)}</span>`,
+      answer: String(simpleNumer * scale),
+    };
+  }
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${frac(simpleNumer * scale, simpleDenom * scale)} = ${frac('___', simpleDenom)}</span>`,
+    answer: String(simpleNumer),
+  };
+}
+
+// ── Fraction Arithmetic ───────────────────────────────────────
+
+function genFractionArithmetic(config) {
+  const { operation, sameDenom, maxDenom } = config;
+
+  if (operation === '×') {
+    const n1 = randomInt(1, 5), d1 = randomInt(n1 + 1, 8);
+    const n2 = randomInt(1, 5), d2 = randomInt(n2 + 1, 8);
+    const [sn, sd] = simplifyFraction(n1 * n2, d1 * d2);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${frac(n1, d1)} × ${frac(n2, d2)} =</span>`,
+      answer: fractionToString(sn, sd),
+    };
+  }
+
+  if (sameDenom) {
+    const denom = randomInt(2, maxDenom);
+    if (operation === '+') {
+      const n1 = randomInt(1, denom - 2);
+      const n2 = randomInt(1, denom - n1);
+      const [sn, sd] = simplifyFraction(n1 + n2, denom);
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">${frac(n1, denom)} + ${frac(n2, denom)} =</span>`,
+        answer: fractionToString(sn, sd),
+      };
+    }
+    const n1 = randomInt(2, denom - 1);
+    const n2 = randomInt(1, n1 - 1);
+    const [sn, sd] = simplifyFraction(n1 - n2, denom);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${frac(n1, denom)} − ${frac(n2, denom)} =</span>`,
+      answer: fractionToString(sn, sd),
+    };
+  }
+
+  // Different denominators
+  const d1 = randomInt(2, Math.floor(maxDenom / 2));
+  const d2 = randomInt(2, Math.floor(maxDenom / 2));
+  if (d1 === d2) return genFractionArithmetic(config);
+  const n1 = randomInt(1, d1 - 1);
+  const n2 = randomInt(1, d2 - 1);
+  const commonD = lcm(d1, d2);
+  if (commonD > 24) return genFractionArithmetic(config);
+
+  if (operation === '+') {
+    const sumN = n1 * (commonD / d1) + n2 * (commonD / d2);
+    const [sn, sd] = simplifyFraction(sumN, commonD);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${frac(n1, d1)} + ${frac(n2, d2)} =</span>`,
+      answer: fractionToString(sn, sd),
+    };
+  }
+  const val1 = n1 / d1, val2 = n2 / d2;
+  const [bigN, bigD, smallN, smallD] = val1 >= val2 ? [n1, d1, n2, d2] : [n2, d2, n1, d1];
+  const diffN = bigN * (commonD / bigD) - smallN * (commonD / smallD);
+  const [sn, sd] = simplifyFraction(diffN, commonD);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${frac(bigN, bigD)} − ${frac(smallN, smallD)} =</span>`,
+    answer: fractionToString(sn, sd),
+  };
+}
+
+// ── Fraction × Whole Number ───────────────────────────────────
+
+function genFractionMultiply(config) {
+  const { maxDenom, maxWhole } = config;
+  const denom = randomInt(2, maxDenom);
+  const numer = randomInt(1, denom - 1);
+  const whole = randomInt(2, maxWhole);
+  const productN = numer * whole;
+  const [sn, sd] = simplifyFraction(productN, denom);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${frac(numer, denom)} × ${whole} =</span>`,
+    answer: fractionToString(sn, sd),
+  };
+}
+
+// ── Fraction ÷ Whole Number ───────────────────────────────────
+
+function genFractionDivide(config) {
+  const { maxDenom, maxWhole } = config;
+  const numer = randomInt(1, 5);
+  const denom = randomInt(numer + 1, maxDenom);
+  const whole = randomInt(2, maxWhole);
+  const [sn, sd] = simplifyFraction(numer, denom * whole);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${frac(numer, denom)} ÷ ${whole} =</span>`,
+    answer: fractionToString(sn, sd),
+  };
+}
+
+// ── Improper Fractions / Mixed Numbers ────────────────────────
+
+function genImproperMixed(config) {
+  const { maxDenom, maxWhole } = config;
+  const denom = randomInt(2, maxDenom);
+  const whole = randomInt(1, maxWhole);
+  const numer = randomInt(1, denom - 1);
+  const improperN = whole * denom + numer;
+
+  if (Math.random() > 0.5) {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Write as an improper fraction: ${whole} ${frac(numer, denom)} =</span>`,
+      answer: frac(improperN, denom),
+    };
+  }
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Write as a mixed number: ${frac(improperN, denom)} =</span>`,
+    answer: `${whole} ${frac(numer, denom)}`,
+  };
+}
+
+// ── Decimal Arithmetic ────────────────────────────────────────
+
+function genDecimalArithmetic(config) {
+  const { decimalPlaces, operation, maxValue } = config;
+  const factor = Math.pow(10, decimalPlaces);
+  const maxInt = Math.floor(maxValue * factor);
+  const ops = operation === '+-' ? ['+', '−'] : [operation === '-' ? '−' : operation];
+  const op = randomChoice(ops);
+
+  const a = randomInt(1, Math.floor(maxInt / 2)) / factor;
+  const b = randomInt(1, Math.floor(maxInt / 2)) / factor;
+
+  if (op === '+') {
+    const ans = Math.round((a + b) * factor) / factor;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${a.toFixed(decimalPlaces)} + ${b.toFixed(decimalPlaces)} =</span>`,
+      answer: ans.toFixed(decimalPlaces),
+    };
+  }
+  if (op === '−') {
+    const big = Math.max(a, b), small = Math.min(a, b);
+    const ans = Math.round((big - small) * factor) / factor;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${big.toFixed(decimalPlaces)} − ${small.toFixed(decimalPlaces)} =</span>`,
+      answer: ans.toFixed(decimalPlaces),
+    };
+  }
+  // multiplication: decimal × whole number
+  const whole = randomInt(2, 9);
+  const ans = Math.round(a * whole * factor) / factor;
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${a.toFixed(decimalPlaces)} × ${whole} =</span>`,
+    answer: ans.toFixed(decimalPlaces),
+  };
+}
+
+// ── Area ──────────────────────────────────────────────────────
+
+function genArea(config) {
+  const { shape, minSide, maxSide } = config;
+
+  if (shape === 'rectangle') {
+    const l = randomInt(minSide, maxSide);
+    const w = randomInt(minSide, maxSide);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of rectangle: length = ${l} cm, width = ${w} cm</span>`,
+      answer: `${l * w} cm²`,
+    };
+  }
+  if (shape === 'triangle') {
+    const b = randomInt(minSide, maxSide) * 2;
+    const h = randomInt(minSide, maxSide);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of triangle: base = ${b} cm, height = ${h} cm</span>`,
+      answer: `${(b * h) / 2} cm²`,
+    };
+  }
+  if (shape === 'parallelogram') {
+    const b = randomInt(minSide, maxSide);
+    const h = randomInt(minSide, maxSide);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of parallelogram: base = ${b} cm, height = ${h} cm</span>`,
+      answer: `${b * h} cm²`,
+    };
+  }
+  if (shape === 'trapezium') {
+    const a = randomInt(minSide, maxSide);
+    const b = randomInt(minSide, maxSide);
+    const h = randomInt(minSide, maxSide) * 2; // even height for integer area
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Area of trapezium: parallel sides = ${a} cm and ${b} cm, height = ${h} cm</span>`,
+      answer: `${((a + b) * h) / 2} cm²`,
+    };
+  }
+}
+
+// ── Perimeter ─────────────────────────────────────────────────
+
+function genPerimeter(config) {
+  const { minSide, maxSide } = config;
+  const l = randomInt(minSide, maxSide);
+  const w = randomInt(minSide, maxSide);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Perimeter of rectangle: ${l} cm × ${w} cm</span>`,
+    answer: `${2 * (l + w)} cm`,
+  };
+}
+
+// ── Prime / Composite ─────────────────────────────────────────
+
+const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]);
+
+function genPrimeComposite(config) {
+  const { min, max } = config;
+  const n = randomInt(min, max);
+  const type = randomInt(0, 1);
+
+  if (type === 0) {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Is ${n} prime or composite?</span>`,
+      answer: PRIMES.has(n) ? 'Prime' : 'Composite',
+    };
+  }
+  const factors = [];
+  for (let i = 1; i <= n; i++) if (n % i === 0) factors.push(i);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">List all factors of ${n}:</span>`,
+    answer: factors.join(', '),
+  };
+}
+
+// ── Factors ───────────────────────────────────────────────────
+
+function genFactors(config) {
+  const { min, max } = config;
+  const type = randomInt(0, 1);
+
+  if (type === 0) {
+    const n = randomInt(min, max);
+    const factors = [];
+    for (let i = 1; i <= n; i++) if (n % i === 0) factors.push(i);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">List all factors of ${n}:</span>`,
+      answer: factors.join(', '),
+    };
+  }
+  const base = randomInt(2, 10);
+  const multiples = Array.from({ length: 6 }, (_, i) => base * (i + 1));
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">List the first 6 multiples of ${base}:</span>`,
+    answer: multiples.join(', '),
+  };
+}
+
+// ── Order of Operations ───────────────────────────────────────
+
+function genOrderOfOps(config) {
+  const { level } = config;
+
+  if (level === 1) {
+    const a = randomInt(1, 10), b = randomInt(2, 9), c = randomInt(2, 9);
+    if (Math.random() > 0.5) {
+      return { layout: 'inline', html: `<span class="prob-text">${a} + ${b} × ${c} =</span>`, answer: String(a + b * c) };
+    }
+    return { layout: 'inline', html: `<span class="prob-text">${a} × ${b} + ${c} =</span>`, answer: String(a * b + c) };
+  }
+
+  const a = randomInt(2, 8), b = randomInt(2, 8), c = randomInt(2, 8);
+  const type = randomInt(0, 2);
+  if (type === 0) {
+    return { layout: 'inline', html: `<span class="prob-text">(${a} + ${b}) × ${c} =</span>`, answer: String((a + b) * c) };
+  }
+  if (type === 1) {
+    return { layout: 'inline', html: `<span class="prob-text">${a} × (${b} + ${c}) =</span>`, answer: String(a * (b + c)) };
+  }
+  return { layout: 'inline', html: `<span class="prob-text">${a}² + ${b} × ${c} =</span>`, answer: String(a * a + b * c) };
+}
+
+// ── Percentages ───────────────────────────────────────────────
+
+function genPercentage(config) {
+  const { level } = config;
+  const pctOptions = level === 1 ? [10, 20, 25, 50, 75] : [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80];
+  const pct = randomChoice(pctOptions);
+  const answer = randomInt(1, level === 1 ? 20 : 40);
+  const whole = answer * (100 / pct);
+  if (!Number.isInteger(whole) || whole > 200) return genPercentage(config);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Find ${pct}% of ${whole}:</span>`,
+    answer: String(answer),
+  };
+}
+
+// ── Fraction / Decimal / Percentage Conversion ────────────────
+
+const COMMON_FRACS = [
+  [1, 2, '0.5', '50'], [1, 4, '0.25', '25'], [3, 4, '0.75', '75'],
+  [1, 5, '0.2', '20'], [2, 5, '0.4', '40'], [3, 5, '0.6', '60'], [4, 5, '0.8', '80'],
+  [1, 10, '0.1', '10'], [3, 10, '0.3', '30'], [7, 10, '0.7', '70'],
+];
+
+function genFracDecPct() {
+  const [n, d, dec, pct] = randomChoice(COMMON_FRACS);
+  const type = randomInt(0, 2);
+  if (type === 0) {
+    return { layout: 'inline', html: `<span class="prob-text">Write ${frac(n, d)} as a decimal:</span>`, answer: dec };
+  }
+  if (type === 1) {
+    return { layout: 'inline', html: `<span class="prob-text">Write ${dec} as a percentage:</span>`, answer: `${pct}%` };
+  }
+  return { layout: 'inline', html: `<span class="prob-text">Write ${pct}% as a fraction in lowest terms:</span>`, answer: frac(n, d) };
+}
+
+// ── Ratios ────────────────────────────────────────────────────
+
+function genRatio(config) {
+  const { maxValue } = config;
+  const a = randomInt(1, maxValue), b = randomInt(1, maxValue);
+  const g = gcd(a, b);
+  const simA = a / g, simB = b / g;
+
+  if (Math.random() > 0.5 || (simA === a && simB === b)) {
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Simplify the ratio ${a} : ${b}:</span>`,
+      answer: `${simA} : ${simB}`,
+    };
+  }
+  const scale = randomInt(2, 4);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Complete the equivalent ratio: ${simA} : ${simB} = ___ : ${simB * scale}</span>`,
+    answer: String(simA * scale),
+  };
+}
+
+// ── Negative Numbers ──────────────────────────────────────────
+
+function genNegativeNumbers(config) {
+  const { min, max } = config;
+  const a = randomInt(min, max);
+  const b = randomInt(0, Math.abs(min));
+  const op = Math.random() > 0.5 ? '+' : '−';
+  const ans = op === '+' ? a + b : a - b;
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">${a} ${op} ${b} =</span>`,
+    answer: String(ans),
+  };
+}
+
+// ── Algebra: Substitution ─────────────────────────────────────
+
+function genAlgebraSubstitution(config) {
+  const { maxCoeff, maxConst, maxValue } = config;
+  const x = randomInt(1, maxValue);
+  const a = randomInt(1, maxCoeff);
+  const b = randomInt(0, maxConst);
+  const type = randomInt(0, 1);
+
+  if (type === 0) {
+    return { layout: 'inline', html: `<span class="prob-text">If <em>x</em> = ${x}, find ${a}<em>x</em> + ${b}:</span>`, answer: String(a * x + b) };
+  }
+  return { layout: 'inline', html: `<span class="prob-text">If <em>x</em> = ${x}, find ${a}<em>x</em> − ${b}:</span>`, answer: String(a * x - b) };
+}
+
+// ── Simple Equations ──────────────────────────────────────────
+
+function genSimpleEquations(config) {
+  const { maxCoeff, maxAnswer } = config;
+  const x = randomInt(1, maxAnswer);
+  const a = randomInt(1, maxCoeff);
+  const b = randomInt(1, maxAnswer);
+  const type = randomInt(0, 2);
+
+  if (type === 0) {
+    return { layout: 'inline', html: `<span class="prob-text">Solve: ${a}<em>x</em> = ${a * x}</span>`, answer: `x = ${x}` };
+  }
+  if (type === 1) {
+    return { layout: 'inline', html: `<span class="prob-text">Solve: <em>x</em> + ${b} = ${x + b}</span>`, answer: `x = ${x}` };
+  }
+  return { layout: 'inline', html: `<span class="prob-text">Solve: ${a}<em>x</em> + ${b} = ${a * x + b}</span>`, answer: `x = ${x}` };
+}
+
+// ── Volume ────────────────────────────────────────────────────
+
+function genVolume(config) {
+  const { minSide, maxSide } = config;
+  const l = randomInt(minSide, maxSide);
+  const w = randomInt(minSide, maxSide);
+  const h = randomInt(minSide, maxSide);
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Volume of rectangular prism: ${l} cm × ${w} cm × ${h} cm</span>`,
+    answer: `${l * w * h} cm³`,
+  };
+}
+
+// ── Statistics ────────────────────────────────────────────────
+
+function genStatistics(config) {
+  const { setSize, minValue, maxValue } = config;
+  const data = Array.from({ length: setSize }, () => randomInt(minValue, maxValue)).sort((a, b) => a - b);
+  const mean = data.reduce((s, n) => s + n, 0) / setSize;
+  const median = setSize % 2 === 0
+    ? (data[setSize / 2 - 1] + data[setSize / 2]) / 2
+    : data[Math.floor(setSize / 2)];
+  const freq = {};
+  data.forEach(n => { freq[n] = (freq[n] || 0) + 1; });
+  const maxFreq = Math.max(...Object.values(freq));
+  const mode = maxFreq === 1 ? 'No mode' : Object.entries(freq).filter(([, f]) => f === maxFreq).map(([n]) => n).join(', ');
+  const range = data[setSize - 1] - data[0];
+  const dataStr = `{${data.join(', ')}}`;
+  const type = randomInt(0, 3);
+
+  const questions = [
+    { html: `Find the mean of ${dataStr}:`, answer: String(mean % 1 === 0 ? mean : mean.toFixed(1)) },
+    { html: `Find the median of ${dataStr}:`, answer: String(median) },
+    { html: `Find the mode of ${dataStr}:`, answer: mode },
+    { html: `Find the range of ${dataStr}:`, answer: String(range) },
+  ];
+  return { layout: 'inline', html: `<span class="prob-text">${questions[type].html}</span>`, answer: questions[type].answer };
+}
+
+// ── Shape Properties ──────────────────────────────────────────
+
+const SHAPES = [
+  { name: 'circle',        sides: 0, vertices: 0, symmetry: 'Infinite' },
+  { name: 'triangle',      sides: 3, vertices: 3, symmetry: 3 },
+  { name: 'square',        sides: 4, vertices: 4, symmetry: 4 },
+  { name: 'rectangle',     sides: 4, vertices: 4, symmetry: 2 },
+  { name: 'pentagon',      sides: 5, vertices: 5, symmetry: 5 },
+  { name: 'hexagon',       sides: 6, vertices: 6, symmetry: 6 },
+  { name: 'octagon',       sides: 8, vertices: 8, symmetry: 8 },
+  { name: 'parallelogram', sides: 4, vertices: 4, symmetry: 0 },
+  { name: 'rhombus',       sides: 4, vertices: 4, symmetry: 2 },
+];
+
+function genShapeProperties(config) {
+  const { level } = config;
+  const shape = randomChoice(SHAPES);
+
+  if (level === 1) {
+    // Name shape / count sides
+    const type = randomInt(0, 1);
+    if (type === 0) {
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">A ${shape.name} has ___ sides.</span>`,
+        answer: String(shape.sides),
+      };
+    }
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">A ${shape.name} has ___ vertices (corners).</span>`,
+      answer: String(shape.vertices),
+    };
+  }
+
+  // level 2: lines of symmetry
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">How many lines of symmetry does a ${shape.name} have?</span>`,
+    answer: String(shape.symmetry),
+  };
+}
+
+// ── Angles ────────────────────────────────────────────────────
+
+function genAngles(config) {
+  const { mode } = config;
+
+  if (mode === 'name') {
+    const types = [
+      { label: 'acute',   min: 1,   max: 89  },
+      { label: 'right',   min: 90,  max: 90  },
+      { label: 'obtuse',  min: 91,  max: 179 },
+      { label: 'straight',min: 180, max: 180 },
+      { label: 'reflex',  min: 181, max: 359 },
+    ];
+    const chosen = randomChoice(types);
+    const deg = randomInt(chosen.min, chosen.max);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Name this angle: ${deg}°</span>`,
+      answer: chosen.label,
+    };
+  }
+
+  if (mode === 'missing-line') {
+    const type = randomInt(0, 1);
+    if (type === 0) {
+      // angles on a straight line sum to 180°
+      const a = randomInt(10, 160);
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">Two angles on a straight line: ${a}° and ___°</span>`,
+        answer: `${180 - a}°`,
+      };
+    }
+    // angles at a point sum to 360°
+    const a = randomInt(30, 150), b = randomInt(30, 360 - a - 30);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Three angles at a point: ${a}°, ${b}° and ___°</span>`,
+      answer: `${360 - a - b}°`,
+    };
+  }
+
+  if (mode === 'missing-shape') {
+    const type = randomInt(0, 1);
+    if (type === 0) {
+      // triangle: sum = 180°
+      const a = randomInt(20, 120), b = randomInt(20, 160 - a);
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">Angles in a triangle: ${a}°, ${b}° and ___°</span>`,
+        answer: `${180 - a - b}°`,
+      };
+    }
+    // quadrilateral: sum = 360°
+    const a = randomInt(50, 130), b = randomInt(50, 130), c = randomInt(50, 360 - a - b - 50);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Angles in a quadrilateral: ${a}°, ${b}°, ${c}° and ___°</span>`,
+      answer: `${360 - a - b - c}°`,
+    };
+  }
+}
+
+// ── Coordinates ───────────────────────────────────────────────
+
+function genCoordinates(config) {
+  const { mode, maxCoord } = config;
+  const letters = 'ABCDEFGHIJKLMNOP';
+
+  if (mode === 'read') {
+    const x = randomInt(0, maxCoord), y = randomInt(0, maxCoord);
+    const label = randomChoice(letters.split(''));
+    const type = randomInt(0, 1);
+    if (type === 0) {
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">Point ${label} is at (${x}, ${y}). What is its x-coordinate?</span>`,
+        answer: String(x),
+      };
+    }
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Point ${label} is at (${x}, ${y}). What is its y-coordinate?</span>`,
+      answer: String(y),
+    };
+  }
+
+  // transform: translate a point
+  const x = randomInt(1, maxCoord), y = randomInt(1, maxCoord);
+  const dx = randomInt(-3, 3), dy = randomInt(-3, 3);
+  const nx = x + dx, ny = y + dy;
+  if (nx < 0 || ny < 0) return genCoordinates(config);
+  const dirX = dx >= 0 ? `${dx} right` : `${Math.abs(dx)} left`;
+  const dirY = dy >= 0 ? `${dy} up` : `${Math.abs(dy)} down`;
+  return {
+    layout: 'inline',
+    html: `<span class="prob-text">Translate (${x}, ${y}) by ${dirX} and ${dirY}. New coordinates:</span>`,
+    answer: `(${nx}, ${ny})`,
+  };
+}
+
+// ── Triangle Classification ───────────────────────────────────
+
+function genTriangleClassify() {
+  const questions = [
+    { html: 'A triangle with 3 equal sides is called an ___ triangle.', answer: 'equilateral' },
+    { html: 'A triangle with 2 equal sides is called an ___ triangle.', answer: 'isosceles' },
+    { html: 'A triangle with no equal sides is called a ___ triangle.', answer: 'scalene' },
+    { html: 'A triangle with one 90° angle is called a ___ triangle.', answer: 'right-angled' },
+    { html: 'An equilateral triangle has ___ lines of symmetry.', answer: '3' },
+    { html: 'An isosceles triangle has ___ line(s) of symmetry.', answer: '1' },
+    { html: 'A scalene triangle has ___ lines of symmetry.', answer: '0' },
+    { html: 'Each angle in an equilateral triangle measures ___°.', answer: '60' },
+    { html: 'The three interior angles of any triangle add up to ___°.', answer: '180' },
+    { html: 'A triangle with angles 60°, 60° and 60° is called an ___ triangle.', answer: 'equilateral' },
+    { html: 'A triangle with one angle greater than 90° is called an ___ triangle.', answer: 'obtuse' },
+    { html: 'A triangle with all angles less than 90° is called an ___ triangle.', answer: 'acute' },
+    { html: 'A right-angled isosceles triangle has two angles each measuring ___°.', answer: '45' },
+  ];
+  const q = randomChoice(questions);
+  return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+}
+
+// ── Quadrilateral Properties ──────────────────────────────────
+
+function genQuadrilateralProperties() {
+  const questions = [
+    { html: 'A quadrilateral with exactly 1 pair of parallel sides is called a ___.', answer: 'trapezium' },
+    { html: 'A quadrilateral with 2 pairs of parallel sides and all sides equal is called a ___.', answer: 'rhombus' },
+    { html: 'A quadrilateral with 2 pairs of parallel sides and all angles equal to 90° is called a ___.', answer: 'rectangle' },
+    { html: 'A quadrilateral with all sides equal and all angles 90° is called a ___.', answer: 'square' },
+    { html: 'A parallelogram has ___ pairs of parallel sides.', answer: '2' },
+    { html: 'A rhombus has ___ equal sides.', answer: '4' },
+    { html: 'True or False: A rhombus has 4 right angles.', answer: 'False' },
+    { html: 'True or False: A parallelogram has opposite sides that are equal in length.', answer: 'True' },
+    { html: 'True or False: A trapezium has 2 pairs of parallel sides.', answer: 'False' },
+    { html: 'True or False: Every square is also a rhombus.', answer: 'True' },
+    { html: 'True or False: Every rectangle is also a parallelogram.', answer: 'True' },
+    { html: 'A rhombus has ___ lines of symmetry.', answer: '2' },
+    { html: 'The angles inside any quadrilateral add up to ___°.', answer: '360' },
+    { html: 'A parallelogram has ___ lines of symmetry.', answer: '0' },
+    { html: 'Which shape has all sides equal but angles that are not 90°: square or rhombus?', answer: 'rhombus' },
+  ];
+  const q = randomChoice(questions);
+  return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+}
+
+// ── Dispatcher ────────────────────────────────────────────────
+
+function generateProblem(type, config) {
+  switch (type) {
+    case 'arithmetic':          return genArithmetic(config);
+    case 'sequence':            return genSequence(config);
+    case 'numberBonds':         return genNumberBonds(config);
+    case 'placeValue':          return genPlaceValue(config);
+    case 'rounding':            return genRounding(config);
+    case 'fractionOfGroup':     return genFractionOfGroup(config);
+    case 'money':               return genMoney(config);
+    case 'divisionRemainder':   return genDivisionRemainder(config);
+    case 'equivFractions':      return genEquivFractions(config);
+    case 'fractionArithmetic':  return genFractionArithmetic(config);
+    case 'fractionMultiply':    return genFractionMultiply(config);
+    case 'fractionDivide':      return genFractionDivide(config);
+    case 'improperMixed':       return genImproperMixed(config);
+    case 'decimalArithmetic':   return genDecimalArithmetic(config);
+    case 'area':                return genArea(config);
+    case 'perimeter':           return genPerimeter(config);
+    case 'primeComposite':      return genPrimeComposite(config);
+    case 'factors':             return genFactors(config);
+    case 'orderOfOps':          return genOrderOfOps(config);
+    case 'percentage':          return genPercentage(config);
+    case 'fracDecPct':          return genFracDecPct();
+    case 'ratio':               return genRatio(config);
+    case 'negativeNumbers':     return genNegativeNumbers(config);
+    case 'algebraSubstitution': return genAlgebraSubstitution(config);
+    case 'simpleEquations':     return genSimpleEquations(config);
+    case 'volume':              return genVolume(config);
+    case 'statistics':          return genStatistics(config);
+    case 'shapeProperties':     return genShapeProperties(config);
+    case 'angles':              return genAngles(config);
+    case 'coordinates':             return genCoordinates(config);
+    case 'triangleClassify':        return genTriangleClassify();
+    case 'quadrilateralProperties': return genQuadrilateralProperties();
+    default:
+      return { layout: 'inline', html: '<span class="prob-text">Unknown problem type</span>', answer: '' };
+  }
+}
+
+function generateCurriculumProblems(topic, count) {
+  const problems = [];
+  const maxAttempts = count * 30;
+  let attempts = 0;
+  while (problems.length < count && attempts < maxAttempts) {
+    attempts++;
+    const p = generateProblem(topic.type, topic.config);
+    if (p) problems.push(p);
+  }
+  return problems;
+}
