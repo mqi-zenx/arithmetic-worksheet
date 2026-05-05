@@ -183,27 +183,169 @@ function genFractionOfGroup(config) {
 // ── Money ─────────────────────────────────────────────────────
 
 function genMoney(config) {
-  const { maxAmount } = config;
+  const { maxAmount, mode = 'add-sub' } = config;
   const toAmt = cents => `$${(cents / 100).toFixed(2)}`;
   const maxCents = maxAmount * 100;
-  const a = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
-  const b = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
-  const op = Math.random() > 0.5 ? '+' : '−';
 
-  if (op === '+') {
+  if (mode === 'add-sub') {
+    const a = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
+    const b = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
+    const op = Math.random() > 0.5 ? '+' : '−';
+    if (op === '+') {
+      return { layout: 'inline', html: `<span class="prob-text">${toAmt(a)} + ${toAmt(b)} =</span>`, answer: toAmt(a + b) };
+    }
+    const big = Math.max(a, b), small = Math.min(a, b);
+    return { layout: 'inline', html: `<span class="prob-text">${toAmt(big)} − ${toAmt(small)} =</span>`, answer: toAmt(big - small) };
+  }
+
+  if (mode === 'change') {
+    // Round note values: $5, $10, $20, $50, $100 — capped to maxAmount
+    const notes = [500, 1000, 2000, 5000, 10000].filter(n => n <= maxCents);
+    const note = randomChoice(notes);
+    const price = Math.round(randomInt(Math.floor(note * 0.1), Math.floor(note * 0.9)) / 5) * 5;
     return {
       layout: 'inline',
-      html: `<span class="prob-text">${toAmt(a)} + ${toAmt(b)} =</span>`,
-      answer: toAmt(a + b),
+      html: `<span class="prob-text">Pay ${toAmt(note)} for an item costing ${toAmt(price)}. Change =</span>`,
+      answer: toAmt(note - price),
     };
   }
-  const big = Math.max(a, b), small = Math.min(a, b);
-  return {
-    layout: 'inline',
-    html: `<span class="prob-text">${toAmt(big)} − ${toAmt(small)} =</span>`,
-    answer: toAmt(big - small),
-  };
+
+  if (mode === 'multi-item') {
+    const unitCents = Math.round(randomInt(50, Math.floor(maxCents * 0.3)) / 5) * 5;
+    const qty = randomInt(2, 6);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${qty} items at ${toAmt(unitCents)} each. Total =</span>`,
+      answer: toAmt(unitCents * qty),
+    };
+  }
+
+  if (mode === 'discount') {
+    const pcts = [10, 20, 25, 50];
+    const pct = randomChoice(pcts);
+    // Use multiples of $5 so all answers are whole cents
+    const priceDollars = randomInt(1, Math.floor(maxAmount / 5)) * 5;
+    const priceCents = priceDollars * 100;
+    const savingCents = priceCents * pct / 100;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">${pct}% off $${priceDollars}.00. Sale price =</span>`,
+      answer: toAmt(priceCents - savingCents),
+    };
+  }
 }
+
+// ── Time ──────────────────────────────────────────────────────
+
+function genTime(config) {
+  const { mode } = config;
+  const pad = n => String(n).padStart(2, '0');
+
+  if (mode === 'oclock-halfpast') {
+    const h = randomInt(1, 12);
+    const half = Math.random() > 0.5;
+    const digital = `${h}:${half ? '30' : '00'}`;
+    const words = half ? `half past ${h}` : `${h} o'clock`;
+    if (Math.random() > 0.5) {
+      return { layout: 'inline', html: `<span class="prob-text">Write in words: ${digital}</span>`, answer: words };
+    }
+    return { layout: 'inline', html: `<span class="prob-text">Write as a digital time: ${words}</span>`, answer: digital };
+  }
+
+  if (mode === 'quarter') {
+    const h = randomInt(1, 12);
+    const type = randomChoice(['past', 'to']);
+    if (type === 'past') {
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">Write as a digital time: quarter past ${h}</span>`,
+        answer: `${h}:15`,
+      };
+    }
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Write as a digital time: quarter to ${h}</span>`,
+      answer: `${h - 1 || 12}:45`,
+    };
+  }
+
+  if (mode === 'read-5min') {
+    const h = randomInt(1, 12);
+    const m = randomInt(0, 11) * 5;
+    const digital = `${h}:${pad(m)}`;
+    if (Math.random() > 0.5) {
+      return { layout: 'inline', html: `<span class="prob-text">What time is ${digital}? (write in words)</span>`, answer: m === 0 ? `${h} o'clock` : `${m} past ${h}` };
+    }
+    return { layout: 'inline', html: `<span class="prob-text">Write the digital time for ${m === 0 ? `${h} o'clock` : `${m} past ${h}`}:</span>`, answer: digital };
+  }
+
+  if (mode === 'am-pm') {
+    const questions = [
+      { html: '7:30 in the morning is 7:30 ___ (am or pm)', answer: 'am' },
+      { html: '3:00 in the afternoon is 3:00 ___ (am or pm)', answer: 'pm' },
+      { html: '9:00 at night is 9:00 ___ (am or pm)', answer: 'pm' },
+      { html: '6:15 in the morning is 6:15 ___ (am or pm)', answer: 'am' },
+      { html: 'Midday (noon) is written as ___ (am or pm)', answer: 'pm' },
+      { html: 'Midnight is written as 12:00 ___ (am or pm)', answer: 'am' },
+      { html: 'School starts at 9:00 ___. Which: am or pm?', answer: 'am' },
+      { html: 'Dinner at 6:30 ___. Which: am or pm?', answer: 'pm' },
+    ];
+    const q = randomChoice(questions);
+    return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+  }
+
+  if (mode === 'duration') {
+    // start time and duration in whole 5-minute steps; end within the same 2-hour window
+    const startH = randomInt(8, 18);
+    const startM = randomInt(0, 11) * 5;
+    const durMins = randomInt(1, 11) * 5 + randomInt(0, 3) * 15; // 5–105 min
+    const totalMins = startH * 60 + startM + durMins;
+    const endH = Math.floor(totalMins / 60);
+    const endM = totalMins % 60;
+    const suffix = startH < 12 ? 'am' : 'pm';
+    if (Math.random() > 0.5) {
+      return {
+        layout: 'inline',
+        html: `<span class="prob-text">Start: ${startH}:${pad(startM)} ${suffix}  End: ${endH}:${pad(endM)} ${endH < 12 ? 'am' : 'pm'}. How long? (minutes)</span>`,
+        answer: `${durMins} min`,
+      };
+    }
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Start: ${startH}:${pad(startM)} ${suffix}. Duration: ${durMins} minutes. End time:</span>`,
+      answer: `${endH}:${pad(endM)}`,
+    };
+  }
+
+  if (mode === '24hour') {
+    const h12 = randomInt(1, 12);
+    const m = randomInt(0, 11) * 5;
+    const ampm = Math.random() > 0.5 ? 'am' : 'pm';
+    const h24 = ampm === 'am' ? (h12 === 12 ? 0 : h12) : (h12 === 12 ? 12 : h12 + 12);
+    const digital12 = `${h12}:${pad(m)} ${ampm}`;
+    const digital24 = `${pad(h24)}:${pad(m)}`;
+    if (Math.random() > 0.5) {
+      return { layout: 'inline', html: `<span class="prob-text">Write in 24-hour time: ${digital12}</span>`, answer: digital24 };
+    }
+    return { layout: 'inline', html: `<span class="prob-text">Write in 12-hour time: ${digital24}</span>`, answer: digital12 };
+  }
+
+  if (mode === 'convert-units') {
+    const questions = [
+      () => { const h = randomInt(1, 12); return { html: `How many minutes in ${h} hour${h > 1 ? 's' : ''}?`, answer: String(h * 60) }; },
+      () => { const m = randomChoice([30, 45, 60, 90, 120, 180]); return { html: `${m} minutes = ___ hour(s) and ___ minutes`, answer: `${Math.floor(m/60)} h ${m%60} min` }; },
+      () => { const d = randomInt(1, 7); return { html: `How many hours in ${d} day${d > 1 ? 's' : ''}?`, answer: String(d * 24) }; },
+      () => { const m = randomInt(1, 5); return { html: `How many seconds in ${m} minute${m > 1 ? 's' : ''}?`, answer: String(m * 60) }; },
+      () => { const s = randomChoice([60, 120, 180, 240, 300]); return { html: `${s} seconds = ___ minutes`, answer: String(s / 60) }; },
+      () => { return { html: 'How many days in a week?', answer: '7' }; },
+      () => { return { html: 'How many months in a year?', answer: '12' }; },
+      () => { const w = randomInt(1, 4); return { html: `How many days in ${w} week${w > 1 ? 's' : ''}?`, answer: String(w * 7) }; },
+    ];
+    const q = randomChoice(questions)();
+    return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
+  }
+}
+
 
 // ── Division with Remainders ──────────────────────────────────
 
@@ -907,6 +1049,7 @@ function generateProblem(type, config) {
     case 'shapeProperties':     return genShapeProperties(config);
     case 'angles':              return genAngles(config);
     case 'coordinates':             return genCoordinates(config);
+    case 'time':                    return genTime(config);
     case 'triangleClassify':        return genTriangleClassify();
     case 'quadrilateralProperties': return genQuadrilateralProperties();
     default:
