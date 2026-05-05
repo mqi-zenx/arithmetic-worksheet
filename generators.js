@@ -1015,6 +1015,59 @@ function genQuadrilateralProperties() {
   return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
 }
 
+// ── Analog Clock ──────────────────────────────────────────────
+
+function clockSVG(h, m) {
+  const cx = 60, cy = 60, r = 54;
+  const toRad = deg => (deg - 90) * Math.PI / 180;
+
+  const mAngle = m * 6;
+  const hAngle = (h % 12) * 30 + m * 0.5;
+
+  const mRad = toRad(mAngle), hRad = toRad(hAngle);
+  const mX = (cx + 42 * Math.cos(mRad)).toFixed(1);
+  const mY = (cy + 42 * Math.sin(mRad)).toFixed(1);
+  const hX = (cx + 28 * Math.cos(hRad)).toFixed(1);
+  const hY = (cy + 28 * Math.sin(hRad)).toFixed(1);
+
+  const ticks = Array.from({ length: 60 }, (_, i) => {
+    const a = toRad(i * 6);
+    const isHour = i % 5 === 0;
+    const inner = isHour ? r - 8 : r - 4;
+    return `<line x1="${(cx + inner * Math.cos(a)).toFixed(1)}" y1="${(cy + inner * Math.sin(a)).toFixed(1)}" x2="${(cx + r * Math.cos(a)).toFixed(1)}" y2="${(cy + r * Math.sin(a)).toFixed(1)}" stroke="#333" stroke-width="${isHour ? 2 : 1}"/>`;
+  }).join('');
+
+  const nums = Array.from({ length: 12 }, (_, i) => {
+    const n = i + 1;
+    const a = toRad(n * 30);
+    return `<text x="${(cx + 43 * Math.cos(a)).toFixed(1)}" y="${(cy + 43 * Math.sin(a) + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" font-family="sans-serif" fill="#111">${n}</text>`;
+  }).join('');
+
+  return `<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="white" stroke="#111" stroke-width="2.5"/>
+  ${ticks}
+  ${nums}
+  <line x1="${cx}" y1="${cy}" x2="${hX}" y2="${hY}" stroke="#111" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="${cx}" y1="${cy}" x2="${mX}" y2="${mY}" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="${cx}" cy="${cy}" r="3" fill="#111"/>
+</svg>`;
+}
+
+function genAnalogClock(config) {
+  const { mode } = config;
+  const h = randomInt(1, 12);
+  let m;
+  if (mode === 'oclock-halfpast') m = randomChoice([0, 30]);
+  else if (mode === 'quarter')    m = randomChoice([0, 15, 30, 45]);
+  else                            m = randomInt(0, 11) * 5;
+
+  return {
+    layout: 'clock',
+    html: clockSVG(h, m),
+    answer: `${h}:${String(m).padStart(2, '0')}`,
+  };
+}
+
 // ── Dispatcher ────────────────────────────────────────────────
 
 function generateProblem(type, config) {
@@ -1052,6 +1105,7 @@ function generateProblem(type, config) {
     case 'time':                    return genTime(config);
     case 'triangleClassify':        return genTriangleClassify();
     case 'quadrilateralProperties': return genQuadrilateralProperties();
+    case 'analogClock':             return genAnalogClock(config);
     default:
       return { layout: 'inline', html: '<span class="prob-text">Unknown problem type</span>', answer: '' };
   }

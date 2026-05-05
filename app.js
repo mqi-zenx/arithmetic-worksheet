@@ -93,10 +93,13 @@ function renderWorksheet(topic, problems) {
   // Determine dominant layout
   const hasColumn = problems.some(p => p.layout === 'column' || p.layout === 'longdivision');
   const hasInline = problems.some(p => p.layout === 'inline');
+  const hasClock  = problems.some(p => p.layout === 'clock');
   const hasLD     = problems.some(p => p.layout === 'longdivision');
 
   let gridClass;
-  if (hasColumn && !hasInline) {
+  if (hasClock) {
+    gridClass = 'cols-2-clock';
+  } else if (hasColumn && !hasInline) {
     gridClass = hasLD ? 'cols-2' : (problems.length <= 10 ? 'cols-2' : problems.length <= 18 ? 'cols-3' : 'cols-4');
   } else {
     gridClass = 'cols-2-inline';
@@ -147,6 +150,17 @@ function renderProblem(p, num) {
               <span class="ld-dividend">${p.operandA}</span>
             </div>
           </div>
+        </div>
+      </div>`;
+  }
+
+  if (p.layout === 'clock') {
+    return `
+      <div class="problem clock-problem">
+        <span class="problem-number">${num}</span>
+        <div class="clock-body">
+          ${p.html}
+          <div class="prob-answer-line"></div>
         </div>
       </div>`;
   }

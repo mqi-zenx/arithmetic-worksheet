@@ -394,6 +394,39 @@ body {
   border-bottom: 1px solid #bbb;
 }
 
+/* ── Clock problems ─────────────────────────────────────────── */
+
+.problem-grid.cols-2-clock { grid-template-columns: repeat(2, 1fr); gap: 24px 40px; }
+
+.clock-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.clock-problem .problem-number {
+  position: static;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: #888;
+  font-family: 'Georgia', serif;
+  line-height: 1.6;
+  min-width: 18px;
+}
+
+.clock-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.clock-body svg { display: block; }
+
+.clock-body .prob-answer-line { width: 120px; }
+
 /* ============================
    Print Styles
    ============================ */
