@@ -40,9 +40,10 @@ function genArithmetic(config) {
   const { operations, minOperand, maxOperand, minOperandA, maxOperandA, restrictTables, difficulty = 1 } = config;
   const op = randomChoice(operations);
 
-  // Difficulty scales operand ceilings for +/−
-  const addSubMax = [20, 100, 1000, 10000, 100000][difficulty - 1];
-  const scaledMax = maxOperand ? Math.max(maxOperand, Math.min(addSubMax, addSubMax)) : addSubMax;
+  // Multiply the base config ceiling by a difficulty factor so every topic scales visibly
+  const diffFactor = [1, 2, 5, 10, 20][difficulty - 1];
+  const baseMax    = maxOperand ?? 20;
+  const scaledMax  = Math.round(baseMax * diffFactor);
 
   if (op === 'LD') {
     const maxQ = [20, 50, 99, 999, 9999][difficulty - 1];
@@ -52,57 +53,51 @@ function genArithmetic(config) {
   }
 
   if (op === '×' && restrictTables) {
-    const table = randomChoice(restrictTables);
-    const otherMax = difficulty <= 2 ? maxOperand : difficulty <= 3 ? 12 : difficulty <= 4 ? 99 : 999;
-    const other = randomInt(minOperand, otherMax);
+    const table  = randomChoice(restrictTables);
+    const other  = randomInt(minOperand ?? 1, Math.round((maxOperand ?? 10) * diffFactor));
     return { layout: 'column', operandA: table, operandB: other, operator: '×', answer: String(table * other) };
   }
 
   if (op === '×' && minOperandA !== undefined) {
-    const aMax = difficulty <= 3 ? maxOperandA : difficulty === 4 ? 99 : 999;
-    const bMax = difficulty <= 3 ? maxOperand : difficulty === 4 ? 99 : 99;
-    const a = randomInt(minOperandA, aMax);
-    const b = randomInt(minOperand, bMax);
+    const a = randomInt(minOperandA, Math.round(maxOperandA * diffFactor));
+    const b = randomInt(minOperand ?? 1, Math.round((maxOperand ?? 10) * diffFactor));
     return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
   }
 
   if (op === '+') {
-    const max = scaledMax;
-    // Harder/Hardest: inverse — "What must you add to A to get B?"
     if (difficulty >= 4) {
-      const b = randomInt(Math.floor(max * 0.4), max);
+      const b = randomInt(Math.floor(scaledMax * 0.4), scaledMax);
       const a = randomInt(1, b - 1);
       return { layout: 'inline', html: `<span class="prob-text">What must you add to ${a} to get ${b}?</span>`, answer: String(b - a) };
     }
-    const a = randomInt(minOperand ?? 1, max);
-    const b = randomInt(minOperand ?? 1, max);
+    const a = randomInt(minOperand ?? 1, scaledMax);
+    const b = randomInt(minOperand ?? 1, scaledMax);
     return { layout: 'column', operandA: a, operandB: b, operator: '+', answer: String(a + b) };
   }
 
   if (op === '-') {
-    const max = scaledMax;
     if (difficulty >= 4) {
-      const a = randomInt(Math.floor(max * 0.4), max);
+      const a = randomInt(Math.floor(scaledMax * 0.4), scaledMax);
       const b = randomInt(1, a - 1);
       return { layout: 'inline', html: `<span class="prob-text">What must you subtract from ${a} to get ${a - b}?</span>`, answer: String(b) };
     }
-    const a = randomInt(minOperand ?? 1, max);
+    const a = randomInt(minOperand ?? 1, scaledMax);
     const b = randomInt(minOperand ?? 1, a);
     return { layout: 'column', operandA: a, operandB: b, operator: '−', answer: String(a - b) };
   }
 
   if (op === '×') {
-    const aMax = difficulty <= 2 ? (maxOperand ?? 10) : difficulty === 3 ? 99 : difficulty === 4 ? 99 : 999;
-    const bMax = difficulty <= 2 ? (maxOperand ?? 10) : difficulty === 3 ? 12 : 99;
+    const aMax = Math.round((maxOperandA ?? maxOperand ?? 10) * diffFactor);
+    const bMax = Math.round((maxOperand ?? 10) * Math.min(diffFactor, 10));
     const a = randomInt(minOperand ?? 2, aMax);
     const b = randomInt(minOperand ?? 2, bMax);
     return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
   }
 
   if (op === '÷') {
-    const aMax = difficulty <= 2 ? (maxOperand ?? 10) : difficulty === 3 ? 12 : 20;
-    const a = randomInt(minOperand ?? 2, aMax);
-    const b = randomInt(minOperand ?? 2, aMax);
+    const tableMax = Math.min(20, Math.round((maxOperand ?? 10) * Math.min(diffFactor, 5)));
+    const a = randomInt(minOperand ?? 2, tableMax);
+    const b = randomInt(minOperand ?? 2, tableMax);
     return { layout: 'column', operandA: a * b, operandB: b, operator: '÷', answer: String(a) };
   }
 }
@@ -174,11 +169,13 @@ function genPlaceValue(config) {
 
 function genRounding(config) {
   const { difficulty = 1 } = config;
-  const scaleMap = [[10], [100], [1000], [10000], [100000]];
-  const roundTo = config.roundTo ?? scaleMap[difficulty - 1];
+  // Scale the rounding targets by difficulty — always applied regardless of config
+  const baseRoundTo = config.roundTo ?? [10];
+  const scale = [1, 10, 100, 1000, 10000][difficulty - 1];
+  const roundTo = baseRoundTo.map(r => r * scale);
   const maxMagnitude = Math.max(...roundTo) * 100;
-  const minValue = config.minValue ?? Math.floor(maxMagnitude * 0.1);
-  const maxValue = config.maxValue ?? maxMagnitude;
+  const minValue = Math.floor(maxMagnitude * 0.1);
+  const maxValue = maxMagnitude;
   const num = randomInt(minValue, maxValue);
   const to = randomChoice(roundTo);
   const rounded = Math.round(num / to) * to;
@@ -419,7 +416,8 @@ function genEquivFractions(config) {
 
 function genFractionArithmetic(config) {
   const { operation, sameDenom, difficulty = 1 } = config;
-  const maxDenom = config.maxDenom ?? ([4, 6, 10, 20, 20][difficulty - 1]);
+  // Multiply base denom ceiling by difficulty factor so higher levels use harder fractions
+  const maxDenom = Math.round((config.maxDenom ?? 4) * [1, 1.5, 2.5, 4, 5][difficulty - 1]);
 
   // Harder/Hardest: mixed number addition/subtraction
   if (difficulty >= 4 && operation !== '×') {
@@ -562,8 +560,9 @@ function genImproperMixed(config) {
 
 function genDecimalArithmetic(config) {
   const { operation, difficulty = 1 } = config;
-  const decimalPlaces = config.decimalPlaces ?? (difficulty <= 2 ? 1 : 2);
-  const maxValue = config.maxValue ?? ([10, 20, 100, 100, 200][difficulty - 1]);
+  // Always scale: more decimal places and larger values at higher difficulty
+  const decimalPlaces = Math.min(3, (config.decimalPlaces ?? 1) + Math.floor((difficulty - 1) / 2));
+  const maxValue = (config.maxValue ?? 10) * [1, 3, 8, 20, 50][difficulty - 1];
   const factor = Math.pow(10, decimalPlaces);
   const maxInt = Math.floor(maxValue * factor);
   const ops = operation === '+-' ? ['+', '−'] : [operation === '-' ? '−' : operation];
@@ -858,8 +857,9 @@ function genAlgebraSubstitution(config) {
 
 function genSimpleEquations(config) {
   const { difficulty = 1 } = config;
-  const maxCoeff  = config.maxCoeff  ?? ([3, 5, 8, 12, 20][difficulty - 1]);
-  const maxAnswer = config.maxAnswer ?? ([10, 20, 30, 50, 100][difficulty - 1]);
+  const diffFactor = [1, 2, 3, 5, 8][difficulty - 1];
+  const maxCoeff  = Math.round((config.maxCoeff  ?? 3) * diffFactor);
+  const maxAnswer = Math.round((config.maxAnswer ?? 10) * diffFactor);
 
   const x = randomInt(1, maxAnswer);
   const a = randomInt(1, maxCoeff);
