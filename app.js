@@ -9,8 +9,16 @@ const printBtn       = document.getElementById('btn-print');
 const errorMsg       = document.getElementById('error-msg');
 const worksheetEl    = document.getElementById('worksheet');
 
-let activeYear  = null;
-let activeTopic = null;
+let activeYear        = null;
+let activeTopic       = null;
+let currentDifficulty = 1;
+
+document.getElementById('difficulty-btns').addEventListener('click', e => {
+  const btn = e.target.closest('.diff-btn');
+  if (!btn) return;
+  currentDifficulty = parseInt(btn.dataset.level, 10);
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+});
 
 // ── Build year tabs ───────────────────────────────────────────
 
@@ -66,7 +74,7 @@ generateBtn.addEventListener('click', () => {
   errorMsg.textContent = '';
 
   const count = Math.min(Math.max(parseInt(countInput.value, 10) || activeTopic.defaultCount, 1), 60);
-  const problems = generateCurriculumProblems(activeTopic, count);
+  const problems = generateCurriculumProblems(activeTopic, count, currentDifficulty);
 
   if (problems.length === 0) {
     errorMsg.textContent = 'Could not generate problems. Please try again.';
@@ -88,7 +96,8 @@ if (CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
 
 function renderWorksheet(topic, problems) {
   const yearLabel = CURRICULUM.find(y => y.topics.some(t => t.id === topic.id))?.label ?? '';
-  const title = `${yearLabel} — ${topic.label}`;
+  const diffLabel = ['Easy', 'Medium', 'Hard', 'Harder', 'Hardest'][currentDifficulty - 1];
+  const title = `${yearLabel} — ${topic.label} (${diffLabel})`;
 
   // Determine dominant layout
   const hasColumn = problems.some(p => p.layout === 'column' || p.layout === 'longdivision');

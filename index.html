@@ -27,6 +27,16 @@
             Problems
             <input type="number" id="count-input" min="1" max="60" value="20" />
           </label>
+          <div class="difficulty-row">
+            <span class="difficulty-label">Difficulty</span>
+            <div class="difficulty-btns" id="difficulty-btns">
+              <button class="diff-btn active" data-level="1">Easy</button>
+              <button class="diff-btn" data-level="2">Medium</button>
+              <button class="diff-btn" data-level="3">Hard</button>
+              <button class="diff-btn" data-level="4">Harder</button>
+              <button class="diff-btn" data-level="5">Hardest</button>
+            </div>
+          </div>
           <button class="btn-generate" id="btn-generate">Generate Worksheet</button>
           <p class="error-msg" id="error-msg"></p>
         </div>
