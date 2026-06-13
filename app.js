@@ -6,19 +6,36 @@ const sidebarCtrls   = document.getElementById('sidebar-controls');
 const countInput     = document.getElementById('count-input');
 const generateBtn    = document.getElementById('btn-generate');
 const printBtn       = document.getElementById('btn-print');
+const answersBtn     = document.getElementById('btn-answers');
 const errorMsg       = document.getElementById('error-msg');
 const worksheetEl    = document.getElementById('worksheet');
 
-let activeYear  = null;
-let activeTopic = null;
+let activeYear        = null;
+let activeTopic       = null;
+let currentDifficulty = 1;
+
+document.getElementById('difficulty-btns').addEventListener('click', e => {
+  const btn = e.target.closest('.diff-btn');
+  if (!btn || btn.disabled) return;
+  currentDifficulty = parseInt(btn.dataset.level, 10);
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    const on = b === btn;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  saveState();
+});
 
 // ── Build year tabs ───────────────────────────────────────────
 
 CURRICULUM.forEach(year => {
   const btn = document.createElement('button');
+  btn.type = 'button';
   btn.className = 'year-tab';
   btn.textContent = year.label;
   btn.dataset.yearId = year.id;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-selected', 'false');
   btn.style.setProperty('--year-color', year.color);
   btn.addEventListener('click', () => selectYear(year));
   yearTabsEl.appendChild(btn);
@@ -31,17 +48,24 @@ function selectYear(year) {
   errorMsg.textContent = '';
 
   document.querySelectorAll('.year-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.yearId === year.id);
+    const on = b.dataset.yearId === year.id;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
   });
 
   topicListEl.innerHTML = '';
   year.topics.forEach(topic => {
     const li = document.createElement('li');
-    li.className = 'topic-item';
-    li.textContent = topic.label;
-    li.dataset.topicId = topic.id;
-    li.style.setProperty('--year-color', year.color);
-    li.addEventListener('click', () => selectTopic(topic));
+    li.setAttribute('role', 'none');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'topic-item';
+    btn.textContent = topic.label;
+    btn.dataset.topicId = topic.id;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.style.setProperty('--year-color', year.color);
+    btn.addEventListener('click', () => selectTopic(topic));
+    li.appendChild(btn);
     topicListEl.appendChild(li);
   });
 }
@@ -50,13 +74,34 @@ function selectTopic(topic) {
   activeTopic = topic;
   errorMsg.textContent = '';
 
-  document.querySelectorAll('.topic-item').forEach(li => {
-    li.classList.toggle('active', li.dataset.topicId === topic.id);
+  document.querySelectorAll('.topic-item').forEach(el => {
+    const on = el.dataset.topicId === topic.id;
+    el.classList.toggle('active', on);
+    el.setAttribute('aria-pressed', String(on));
   });
 
   countInput.value = topic.defaultCount;
+
+  // Gate the difficulty control: only show it as active for generators that
+  // actually respond to difficulty, so the selector never silently does nothing.
+  const supportsDifficulty = DIFFICULTY_AWARE_TYPES.has(topic.type);
+  const diffRow = document.querySelector('.difficulty-row');
+  const diffButtons = document.querySelectorAll('.diff-btn');
+  diffRow.classList.toggle('disabled', !supportsDifficulty);
+  diffRow.title = supportsDifficulty ? '' : 'This topic has a fixed difficulty.';
+  diffButtons.forEach(b => { b.disabled = !supportsDifficulty; });
+  if (!supportsDifficulty) {
+    currentDifficulty = 1;
+    diffButtons.forEach(b => {
+      const on = b.dataset.level === '1';
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
   sidebarCtrls.style.display = '';
   generateBtn.focus();
+  saveState();
 }
 
 // ── Generate ──────────────────────────────────────────────────
@@ -66,7 +111,7 @@ generateBtn.addEventListener('click', () => {
   errorMsg.textContent = '';
 
   const count = Math.min(Math.max(parseInt(countInput.value, 10) || activeTopic.defaultCount, 1), 60);
-  const problems = generateCurriculumProblems(activeTopic, count);
+  const problems = generateCurriculumProblems(activeTopic, count, currentDifficulty);
 
   if (problems.length === 0) {
     errorMsg.textContent = 'Could not generate problems. Please try again.';
@@ -75,28 +120,82 @@ generateBtn.addEventListener('click', () => {
 
   renderWorksheet(activeTopic, problems);
   printBtn.disabled = false;
+  answersBtn.disabled = false;
+  // New worksheet always starts with answers hidden.
+  worksheetEl.classList.remove('show-answers');
+  answersBtn.textContent = 'Show Answers';
+  answersBtn.setAttribute('aria-pressed', 'false');
   worksheetEl.scrollIntoView({ behavior: 'smooth' });
 });
 
 printBtn.addEventListener('click', () => window.print());
+countInput.addEventListener('change', saveState);
 
-// ── Select first year on load ─────────────────────────────────
+answersBtn.addEventListener('click', () => {
+  const showing = worksheetEl.classList.toggle('show-answers');
+  answersBtn.textContent = showing ? 'Hide Answers' : 'Show Answers';
+  answersBtn.setAttribute('aria-pressed', String(showing));
+});
 
-if (CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
+// ── Persistence (remember last selection) ─────────────────────
+
+const LS_KEY = 'aw:lastState';
+
+function saveState() {
+  if (!activeTopic) return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      yearId: activeYear && activeYear.id,
+      topicId: activeTopic.id,
+      difficulty: currentDifficulty,
+      count: parseInt(countInput.value, 10) || activeTopic.defaultCount,
+    }));
+  } catch (e) { /* storage unavailable (private mode) — ignore */ }
+}
+
+function restoreState() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { return false; }
+  if (!s) return false;
+  const year = CURRICULUM.find(y => y.id === s.yearId);
+  if (!year) return false;
+  selectYear(year);
+  const topic = year.topics.find(t => t.id === s.topicId);
+  if (!topic) return false;
+  selectTopic(topic);
+  if (DIFFICULTY_AWARE_TYPES.has(topic.type) && s.difficulty) {
+    currentDifficulty = s.difficulty;
+    document.querySelectorAll('.diff-btn').forEach(b => {
+      const on = Number(b.dataset.level) === s.difficulty;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  if (s.count) countInput.value = s.count;
+  return true;
+}
+
+// ── Restore last session, or select the first year ───────────
+
+if (!restoreState() && CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
 
 // ── Render worksheet ──────────────────────────────────────────
 
 function renderWorksheet(topic, problems) {
   const yearLabel = CURRICULUM.find(y => y.topics.some(t => t.id === topic.id))?.label ?? '';
-  const title = `${yearLabel} — ${topic.label}`;
+  const diffLabel = ['Easy', 'Medium', 'Hard', 'Harder', 'Hardest'][currentDifficulty - 1];
+  const title = `${yearLabel} — ${topic.label} (${diffLabel})`;
 
   // Determine dominant layout
   const hasColumn = problems.some(p => p.layout === 'column' || p.layout === 'longdivision');
   const hasInline = problems.some(p => p.layout === 'inline');
+  const hasClock  = problems.some(p => p.layout === 'clock');
   const hasLD     = problems.some(p => p.layout === 'longdivision');
 
   let gridClass;
-  if (hasColumn && !hasInline) {
+  if (hasClock) {
+    gridClass = 'cols-2-clock';
+  } else if (hasColumn && !hasInline) {
     gridClass = hasLD ? 'cols-2' : (problems.length <= 10 ? 'cols-2' : problems.length <= 18 ? 'cols-3' : 'cols-4');
   } else {
     gridClass = 'cols-2-inline';
@@ -121,6 +220,8 @@ function renderWorksheet(topic, problems) {
 }
 
 function renderProblem(p, num) {
+  const key = `<span class="answer-key">${p.answer}</span>`;
+
   if (p.layout === 'column') {
     return `
       <div class="problem">
@@ -131,7 +232,7 @@ function renderProblem(p, num) {
           <span class="operand-b">${p.operandB}</span>
         </div>
         <div class="problem-line"></div>
-        <div class="problem-answer"></div>
+        <div class="problem-answer">${key}</div>
       </div>`;
   }
 
@@ -140,7 +241,7 @@ function renderProblem(p, num) {
       <div class="problem ld-problem">
         <span class="problem-number">${num}</span>
         <div class="ld-layout">
-          <div class="ld-answer-space"></div>
+          <div class="ld-answer-space">${key}</div>
           <div class="ld-bottom">
             <span class="ld-divisor">${p.operandB}</span>
             <div class="ld-box">
@@ -151,13 +252,24 @@ function renderProblem(p, num) {
       </div>`;
   }
 
+  if (p.layout === 'clock') {
+    return `
+      <div class="problem clock-problem">
+        <span class="problem-number">${num}</span>
+        <div class="clock-body">
+          ${p.html}
+          <div class="prob-answer-line">${key}</div>
+        </div>
+      </div>`;
+  }
+
   // inline
   return `
     <div class="problem inline-problem">
       <span class="problem-number">${num}</span>
       <div class="inline-body">
         ${p.html}
-        <div class="prob-answer-line"></div>
+        <div class="prob-answer-line">${key}</div>
       </div>
     </div>`;
 }

@@ -34,51 +34,90 @@ function frac(n, d) {
   return `<sup>${n}</sup>/<sub>${d}</sub>`;
 }
 
+// Difficulty scaling helpers (levels 1–5).
+// `steep`  ~ ×1 ×2 ×5 ×10 ×20  — for ranges that should grow fast (numbers).
+// `gentle` ~ ×1 ×1.5 ×2 ×3 ×4  — for sizes that should grow slowly (denominators, sides).
+// `bump`   ~ +0 +1 +2 +3 +4    — additive bumps (digits, list length).
+const steep  = d => [1, 2, 5, 10, 20][d - 1];
+const gentle = d => [1, 1.5, 2, 3, 4][d - 1];
+const bump   = d => d - 1;
+
+// Curriculum problem types whose generators meaningfully respond to difficulty.
+// (Fixed question banks and mode-defined topics are intentionally excluded so the
+//  UI can disable the difficulty control for them rather than show a no-op.)
+const DIFFICULTY_AWARE_TYPES = new Set([
+  'arithmetic', 'rounding', 'fractionArithmetic', 'decimalArithmetic', 'area',
+  'percentage', 'simpleEquations', 'statistics', 'numberBonds', 'placeValue',
+  'sequence', 'fractionOfGroup', 'money', 'divisionRemainder', 'equivFractions',
+  'fractionMultiply', 'fractionDivide', 'improperMixed', 'perimeter', 'volume',
+  'primeComposite', 'factors', 'orderOfOps', 'ratio', 'negativeNumbers',
+  'algebraSubstitution', 'coordinates', 'wordProblem', 'mixedReview',
+]);
+
 // ── Arithmetic ────────────────────────────────────────────────
 
 function genArithmetic(config) {
-  const { operations, minOperand, maxOperand, minOperandA, maxOperandA, restrictTables } = config;
+  const { operations, minOperand, maxOperand, minOperandA, maxOperandA, restrictTables, difficulty = 1 } = config;
   const op = randomChoice(operations);
 
+  // Multiply the base config ceiling by a difficulty factor so every topic scales visibly
+  const diffFactor = [1, 2, 5, 10, 20][difficulty - 1];
+  const baseMax    = maxOperand ?? 20;
+  const scaledMax  = Math.round(baseMax * diffFactor);
+
   if (op === 'LD') {
-    const divisor = randomInt(2, 9);
-    const quotient = randomInt(11, 99);
+    const maxQ = [20, 50, 99, 999, 9999][difficulty - 1];
+    const divisor = randomInt(2, difficulty >= 3 ? 12 : 9);
+    const quotient = randomInt(11, maxQ);
     return { layout: 'longdivision', operandA: divisor * quotient, operandB: divisor, operator: 'LD', answer: String(quotient) };
   }
 
   if (op === '×' && restrictTables) {
-    const table = randomChoice(restrictTables);
-    const other = randomInt(minOperand, maxOperand);
+    const table  = randomChoice(restrictTables);
+    const other  = randomInt(minOperand ?? 1, Math.round((maxOperand ?? 10) * diffFactor));
     return { layout: 'column', operandA: table, operandB: other, operator: '×', answer: String(table * other) };
   }
 
   if (op === '×' && minOperandA !== undefined) {
-    const a = randomInt(minOperandA, maxOperandA);
-    const b = randomInt(minOperand, maxOperand);
+    const a = randomInt(minOperandA, Math.round(maxOperandA * diffFactor));
+    const b = randomInt(minOperand ?? 1, Math.round((maxOperand ?? 10) * diffFactor));
     return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
   }
 
   if (op === '+') {
-    const a = randomInt(minOperand, maxOperand);
-    const b = randomInt(minOperand, maxOperand);
+    if (difficulty >= 4) {
+      const b = randomInt(Math.floor(scaledMax * 0.4), scaledMax);
+      const a = randomInt(1, b - 1);
+      return { layout: 'inline', html: `<span class="prob-text">What must you add to ${a} to get ${b}?</span>`, answer: String(b - a) };
+    }
+    const a = randomInt(minOperand ?? 1, scaledMax);
+    const b = randomInt(minOperand ?? 1, scaledMax);
     return { layout: 'column', operandA: a, operandB: b, operator: '+', answer: String(a + b) };
   }
 
   if (op === '-') {
-    const a = randomInt(minOperand, maxOperand);
-    const b = randomInt(minOperand, a);
+    if (difficulty >= 4) {
+      const a = randomInt(Math.floor(scaledMax * 0.4), scaledMax);
+      const b = randomInt(1, a - 1);
+      return { layout: 'inline', html: `<span class="prob-text">What must you subtract from ${a} to get ${a - b}?</span>`, answer: String(b) };
+    }
+    const a = randomInt(minOperand ?? 1, scaledMax);
+    const b = randomInt(minOperand ?? 1, a);
     return { layout: 'column', operandA: a, operandB: b, operator: '−', answer: String(a - b) };
   }
 
   if (op === '×') {
-    const a = randomInt(minOperand, maxOperand);
-    const b = randomInt(minOperand, maxOperand);
+    const aMax = Math.round((maxOperandA ?? maxOperand ?? 10) * diffFactor);
+    const bMax = Math.round((maxOperand ?? 10) * Math.min(diffFactor, 10));
+    const a = randomInt(minOperand ?? 2, aMax);
+    const b = randomInt(minOperand ?? 2, bMax);
     return { layout: 'column', operandA: a, operandB: b, operator: '×', answer: String(a * b) };
   }
 
   if (op === '÷') {
-    const a = randomInt(minOperand, maxOperand);
-    const b = randomInt(minOperand, maxOperand);
+    const tableMax = Math.min(20, Math.round((maxOperand ?? 10) * Math.min(diffFactor, 5)));
+    const a = randomInt(minOperand ?? 2, tableMax);
+    const b = randomInt(minOperand ?? 2, tableMax);
     return { layout: 'column', operandA: a * b, operandB: b, operator: '÷', answer: String(a) };
   }
 }
@@ -86,13 +125,17 @@ function genArithmetic(config) {
 // ── Sequences ─────────────────────────────────────────────────
 
 function genSequence(config) {
-  const { step, minStart, maxStart, length, mode = 'forward' } = config;
-  const start = randomInt(minStart, maxStart);
-  const seq = Array.from({ length: length + 1 }, (_, i) =>
+  const { step, minStart, maxStart, length, mode = 'forward', difficulty = 1 } = config;
+  // Higher difficulty starts the sequence from larger numbers and runs longer.
+  const startScale = gentle(difficulty);
+  const len = length + bump(difficulty);
+  let start = randomInt(Math.round(minStart * startScale), Math.round(maxStart * startScale));
+  if (mode === 'backward') start = Math.max(start, len * step); // keep terms non-negative
+  const seq = Array.from({ length: len + 1 }, (_, i) =>
     mode === 'backward' ? start - i * step : start + i * step
   );
 
-  const blankIdx = randomInt(1, length - 1);
+  const blankIdx = randomInt(1, len - 1);
   const answer = seq[blankIdx];
   const displayed = seq.map((n, i) => i === blankIdx ? '___' : String(n));
 
@@ -106,26 +149,30 @@ function genSequence(config) {
 // ── Number Bonds ──────────────────────────────────────────────
 
 function genNumberBonds(config) {
-  const { total } = config;
-  const a = randomInt(1, total - 1);
-  const b = total - a;
+  const { total, difficulty = 1 } = config;
+  // Bonds to 10/20 at Easy scale up to bonds to larger round totals.
+  const scaledTotal = total * steep(difficulty);
+  const a = randomInt(1, scaledTotal - 1);
+  const b = scaledTotal - a;
 
   if (Math.random() > 0.5) {
-    return { layout: 'inline', html: `<span class="prob-text">${a} + ___ = ${total}</span>`, answer: String(b) };
+    return { layout: 'inline', html: `<span class="prob-text">${a} + ___ = ${scaledTotal}</span>`, answer: String(b) };
   }
-  return { layout: 'inline', html: `<span class="prob-text">___ + ${b} = ${total}</span>`, answer: String(a) };
+  return { layout: 'inline', html: `<span class="prob-text">___ + ${b} = ${scaledTotal}</span>`, answer: String(a) };
 }
 
 // ── Place Value ───────────────────────────────────────────────
 
 function genPlaceValue(config) {
-  const { digits } = config;
-  const placeNames = ['ones', 'tens', 'hundreds', 'thousands', 'ten-thousands'];
-  const min = Math.pow(10, digits - 1);
-  const max = Math.pow(10, digits) - 1;
+  const { digits, difficulty = 1 } = config;
+  const placeNames = ['ones', 'tens', 'hundreds', 'thousands', 'ten-thousands', 'hundred-thousands', 'millions'];
+  // Each difficulty level adds a digit (capped at the place-name table).
+  const scaledDigits = Math.min(digits + bump(difficulty), placeNames.length);
+  const min = Math.pow(10, scaledDigits - 1);
+  const max = Math.pow(10, scaledDigits) - 1;
   const num = randomInt(min, max);
 
-  const placeIdx = randomInt(0, digits - 1);
+  const placeIdx = randomInt(0, scaledDigits - 1);
   const placeName = placeNames[placeIdx];
   const placeDigit = Math.floor(num / Math.pow(10, placeIdx)) % 10;
   const placeValue = placeDigit * Math.pow(10, placeIdx);
@@ -149,15 +196,21 @@ function genPlaceValue(config) {
 // ── Rounding ──────────────────────────────────────────────────
 
 function genRounding(config) {
-  const { minValue, maxValue, roundTo } = config;
+  const { difficulty = 1 } = config;
+  // Scale the rounding targets by difficulty — always applied regardless of config
+  const baseRoundTo = config.roundTo ?? [10];
+  const scale = [1, 10, 100, 1000, 10000][difficulty - 1];
+  const roundTo = baseRoundTo.map(r => r * scale);
+  const maxMagnitude = Math.max(...roundTo) * 100;
+  const minValue = Math.floor(maxMagnitude * 0.1);
+  const maxValue = maxMagnitude;
   const num = randomInt(minValue, maxValue);
   const to = randomChoice(roundTo);
   const rounded = Math.round(num / to) * to;
-  const toLabel = to.toLocaleString('en-AU');
 
   return {
     layout: 'inline',
-    html: `<span class="prob-text">Round ${num.toLocaleString('en-AU')} to the nearest ${toLabel}:</span>`,
+    html: `<span class="prob-text">Round ${num.toLocaleString('en-AU')} to the nearest ${to.toLocaleString('en-AU')}:</span>`,
     answer: rounded.toLocaleString('en-AU'),
   };
 }
@@ -165,10 +218,10 @@ function genRounding(config) {
 // ── Fraction of a Group ───────────────────────────────────────
 
 function genFractionOfGroup(config) {
-  const { denominators, maxWhole } = config;
+  const { denominators, maxWhole, difficulty = 1 } = config;
   const denom = randomChoice(denominators);
   const numer = randomInt(1, denom - 1);
-  const maxGroups = Math.floor(maxWhole / denom);
+  const maxGroups = Math.floor((maxWhole * gentle(difficulty)) / denom);
   const groups = randomInt(1, Math.max(1, maxGroups));
   const whole = groups * denom;
   const answer = (numer * whole) / denom;
@@ -183,9 +236,10 @@ function genFractionOfGroup(config) {
 // ── Money ─────────────────────────────────────────────────────
 
 function genMoney(config) {
-  const { maxAmount, mode = 'add-sub' } = config;
+  const { mode = 'add-sub', difficulty = 1 } = config;
+  const maxAmount = config.maxAmount * gentle(difficulty);
   const toAmt = cents => `$${(cents / 100).toFixed(2)}`;
-  const maxCents = maxAmount * 100;
+  const maxCents = Math.round(maxAmount * 100);
 
   if (mode === 'add-sub') {
     const a = Math.round(randomInt(50, Math.floor(maxCents * 0.6)) / 5) * 5;
@@ -350,9 +404,9 @@ function genTime(config) {
 // ── Division with Remainders ──────────────────────────────────
 
 function genDivisionRemainder(config) {
-  const { minDivisor, maxDivisor, minDividend, maxDividend } = config;
-  const divisor = randomInt(minDivisor, maxDivisor);
-  const dividend = randomInt(minDividend, maxDividend);
+  const { minDivisor, maxDivisor, minDividend, maxDividend, difficulty = 1 } = config;
+  const divisor = randomInt(minDivisor, Math.round(maxDivisor * gentle(difficulty)));
+  const dividend = randomInt(minDividend, Math.round(maxDividend * steep(difficulty)));
   const quotient = Math.floor(dividend / divisor);
   const remainder = dividend % divisor;
 
@@ -366,7 +420,8 @@ function genDivisionRemainder(config) {
 // ── Equivalent Fractions ──────────────────────────────────────
 
 function genEquivFractions(config) {
-  const { maxDenom } = config;
+  const { difficulty = 1 } = config;
+  const maxDenom = Math.round(config.maxDenom * gentle(difficulty));
   const simpleNumer = randomInt(1, 4);
   const simpleDenom = randomInt(simpleNumer + 1, 6);
   const maxScale = Math.floor(maxDenom / simpleDenom);
@@ -390,11 +445,41 @@ function genEquivFractions(config) {
 // ── Fraction Arithmetic ───────────────────────────────────────
 
 function genFractionArithmetic(config) {
-  const { operation, sameDenom, maxDenom } = config;
+  const { operation, sameDenom, difficulty = 1 } = config;
+  // Multiply base denom ceiling by difficulty factor so higher levels use harder fractions
+  const maxDenom = Math.round((config.maxDenom ?? 4) * [1, 1.5, 2.5, 4, 5][difficulty - 1]);
+
+  // Harder/Hardest: mixed number addition/subtraction
+  if (difficulty >= 4 && operation !== '×') {
+    const w1 = randomInt(1, 5), w2 = randomInt(1, 5);
+    const d = randomInt(2, 8);
+    const n1 = randomInt(1, d - 1), n2 = randomInt(1, d - 1);
+    if (operation === '+') {
+      const totalN = w1 * d + n1 + w2 * d + n2;
+      const whole = Math.floor(totalN / d), rem = totalN % d;
+      const [sn, sd] = rem === 0 ? [0, 1] : simplifyFraction(rem, d);
+      const ans = rem === 0 ? String(whole) : `${whole} ${fractionToString(sn, sd)}`;
+      return { layout: 'inline', html: `<span class="prob-text">${w1} ${frac(n1, d)} + ${w2} ${frac(n2, d)} =</span>`, answer: ans };
+    }
+    // Subtraction: order operands by total value so the result is never negative,
+    // then subtract via improper fractions (avoids the equal-whole borrow bug).
+    const i1 = w1 * d + n1, i2 = w2 * d + n2;
+    const hi = i1 >= i2 ? [w1, n1] : [w2, n2];
+    const lo = i1 >= i2 ? [w2, n2] : [w1, n1];
+    const diff = Math.abs(i1 - i2);
+    const whole = Math.floor(diff / d), rem = diff % d;
+    const [sn, sd] = rem === 0 ? [0, 1] : simplifyFraction(rem, d);
+    const ans = rem === 0
+      ? String(whole)
+      : (whole === 0 ? fractionToString(sn, sd) : `${whole} ${fractionToString(sn, sd)}`);
+    return { layout: 'inline', html: `<span class="prob-text">${hi[0]} ${frac(hi[1], d)} − ${lo[0]} ${frac(lo[1], d)} =</span>`, answer: ans };
+  }
 
   if (operation === '×') {
-    const n1 = randomInt(1, 5), d1 = randomInt(n1 + 1, 8);
-    const n2 = randomInt(1, 5), d2 = randomInt(n2 + 1, 8);
+    // Denominator ceiling grows with difficulty (8, 12, 16, 24, 32).
+    const dmax = Math.round(8 * gentle(difficulty));
+    const d1 = randomInt(3, dmax), n1 = randomInt(1, d1 - 1);
+    const d2 = randomInt(3, dmax), n2 = randomInt(1, d2 - 1);
     const [sn, sd] = simplifyFraction(n1 * n2, d1 * d2);
     return {
       layout: 'inline',
@@ -457,7 +542,9 @@ function genFractionArithmetic(config) {
 // ── Fraction × Whole Number ───────────────────────────────────
 
 function genFractionMultiply(config) {
-  const { maxDenom, maxWhole } = config;
+  const { difficulty = 1 } = config;
+  const maxDenom = Math.round(config.maxDenom * gentle(difficulty));
+  const maxWhole = Math.round(config.maxWhole * gentle(difficulty));
   const denom = randomInt(2, maxDenom);
   const numer = randomInt(1, denom - 1);
   const whole = randomInt(2, maxWhole);
@@ -473,7 +560,9 @@ function genFractionMultiply(config) {
 // ── Fraction ÷ Whole Number ───────────────────────────────────
 
 function genFractionDivide(config) {
-  const { maxDenom, maxWhole } = config;
+  const { difficulty = 1 } = config;
+  const maxDenom = Math.round(config.maxDenom * gentle(difficulty));
+  const maxWhole = Math.round(config.maxWhole * gentle(difficulty));
   const numer = randomInt(1, 5);
   const denom = randomInt(numer + 1, maxDenom);
   const whole = randomInt(2, maxWhole);
@@ -488,7 +577,9 @@ function genFractionDivide(config) {
 // ── Improper Fractions / Mixed Numbers ────────────────────────
 
 function genImproperMixed(config) {
-  const { maxDenom, maxWhole } = config;
+  const { difficulty = 1 } = config;
+  const maxDenom = Math.round(config.maxDenom * gentle(difficulty));
+  const maxWhole = Math.round(config.maxWhole * gentle(difficulty));
   const denom = randomInt(2, maxDenom);
   const whole = randomInt(1, maxWhole);
   const numer = randomInt(1, denom - 1);
@@ -511,7 +602,10 @@ function genImproperMixed(config) {
 // ── Decimal Arithmetic ────────────────────────────────────────
 
 function genDecimalArithmetic(config) {
-  const { decimalPlaces, operation, maxValue } = config;
+  const { operation, difficulty = 1 } = config;
+  // Always scale: more decimal places and larger values at higher difficulty
+  const decimalPlaces = Math.min(3, (config.decimalPlaces ?? 1) + Math.floor((difficulty - 1) / 2));
+  const maxValue = (config.maxValue ?? 10) * [1, 3, 8, 20, 50][difficulty - 1];
   const factor = Math.pow(10, decimalPlaces);
   const maxInt = Math.floor(maxValue * factor);
   const ops = operation === '+-' ? ['+', '−'] : [operation === '-' ? '−' : operation];
@@ -550,51 +644,56 @@ function genDecimalArithmetic(config) {
 // ── Area ──────────────────────────────────────────────────────
 
 function genArea(config) {
-  const { shape, minSide, maxSide } = config;
+  const { shape, difficulty = 1 } = config;
+  const minSide = config.minSide ?? 2;
+  const maxSide = (config.maxSide ?? 12) * [1, 1.5, 2, 3, 4][difficulty - 1];
+
+  // Hardest: compound shape — rectangle minus right triangle
+  if (difficulty === 5) {
+    const l = randomInt(6, 20), w = randomInt(4, 12);
+    const tb = randomInt(2, Math.floor(l / 2)) * 2, th = randomInt(2, w - 1);
+    const area = l * w - (tb * th) / 2;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">A rectangle (${l} cm × ${w} cm) has a right triangle (base ${tb} cm, height ${th} cm) cut from one corner. Remaining area:</span>`,
+      answer: `${area} cm²`,
+    };
+  }
+
+  // Harder: find missing dimension given area
+  if (difficulty === 4 && (shape === 'rectangle' || !shape)) {
+    const l = randomInt(minSide, Math.floor(maxSide / 2));
+    const w = randomInt(minSide, Math.floor(maxSide / 2));
+    if (Math.random() > 0.5) {
+      return { layout: 'inline', html: `<span class="prob-text">A rectangle has area ${l * w} cm² and width ${w} cm. Find its length:</span>`, answer: `${l} cm` };
+    }
+    return { layout: 'inline', html: `<span class="prob-text">A rectangle has area ${l * w} cm² and length ${l} cm. Find its width:</span>`, answer: `${w} cm` };
+  }
 
   if (shape === 'rectangle') {
-    const l = randomInt(minSide, maxSide);
-    const w = randomInt(minSide, maxSide);
-    return {
-      layout: 'inline',
-      html: `<span class="prob-text">Area of rectangle: length = ${l} cm, width = ${w} cm</span>`,
-      answer: `${l * w} cm²`,
-    };
+    const l = randomInt(minSide, maxSide), w = randomInt(minSide, maxSide);
+    return { layout: 'inline', html: `<span class="prob-text">Area of rectangle: length = ${l} cm, width = ${w} cm</span>`, answer: `${l * w} cm²` };
   }
   if (shape === 'triangle') {
-    const b = randomInt(minSide, maxSide) * 2;
-    const h = randomInt(minSide, maxSide);
-    return {
-      layout: 'inline',
-      html: `<span class="prob-text">Area of triangle: base = ${b} cm, height = ${h} cm</span>`,
-      answer: `${(b * h) / 2} cm²`,
-    };
+    const b = randomInt(minSide, maxSide) * 2, h = randomInt(minSide, maxSide);
+    return { layout: 'inline', html: `<span class="prob-text">Area of triangle: base = ${b} cm, height = ${h} cm</span>`, answer: `${(b * h) / 2} cm²` };
   }
   if (shape === 'parallelogram') {
-    const b = randomInt(minSide, maxSide);
-    const h = randomInt(minSide, maxSide);
-    return {
-      layout: 'inline',
-      html: `<span class="prob-text">Area of parallelogram: base = ${b} cm, height = ${h} cm</span>`,
-      answer: `${b * h} cm²`,
-    };
+    const b = randomInt(minSide, maxSide), h = randomInt(minSide, maxSide);
+    return { layout: 'inline', html: `<span class="prob-text">Area of parallelogram: base = ${b} cm, height = ${h} cm</span>`, answer: `${b * h} cm²` };
   }
   if (shape === 'trapezium') {
-    const a = randomInt(minSide, maxSide);
-    const b = randomInt(minSide, maxSide);
-    const h = randomInt(minSide, maxSide) * 2; // even height for integer area
-    return {
-      layout: 'inline',
-      html: `<span class="prob-text">Area of trapezium: parallel sides = ${a} cm and ${b} cm, height = ${h} cm</span>`,
-      answer: `${((a + b) * h) / 2} cm²`,
-    };
+    const a = randomInt(minSide, maxSide), b = randomInt(minSide, maxSide);
+    const h = randomInt(minSide, maxSide) * 2;
+    return { layout: 'inline', html: `<span class="prob-text">Area of trapezium: parallel sides = ${a} cm and ${b} cm, height = ${h} cm</span>`, answer: `${((a + b) * h) / 2} cm²` };
   }
 }
 
 // ── Perimeter ─────────────────────────────────────────────────
 
 function genPerimeter(config) {
-  const { minSide, maxSide } = config;
+  const { minSide, difficulty = 1 } = config;
+  const maxSide = Math.round(config.maxSide * gentle(difficulty));
   const l = randomInt(minSide, maxSide);
   const w = randomInt(minSide, maxSide);
   return {
@@ -609,8 +708,10 @@ function genPerimeter(config) {
 const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]);
 
 function genPrimeComposite(config) {
-  const { min, max } = config;
-  const n = randomInt(min, max);
+  const { min, max, difficulty = 1 } = config;
+  // Cap at 47 (the largest prime we can classify) so "prime or composite?" stays answerable.
+  const scaledMax = Math.min(47, Math.round(max * gentle(difficulty)));
+  const n = randomInt(min, scaledMax);
   const type = randomInt(0, 1);
 
   if (type === 0) {
@@ -632,11 +733,12 @@ function genPrimeComposite(config) {
 // ── Factors ───────────────────────────────────────────────────
 
 function genFactors(config) {
-  const { min, max } = config;
+  const { min, max, difficulty = 1 } = config;
+  const scaledMax = Math.round(max * gentle(difficulty));
   const type = randomInt(0, 1);
 
   if (type === 0) {
-    const n = randomInt(min, max);
+    const n = randomInt(min, scaledMax);
     const factors = [];
     for (let i = 1; i <= n; i++) if (n % i === 0) factors.push(i);
     return {
@@ -657,17 +759,20 @@ function genFactors(config) {
 // ── Order of Operations ───────────────────────────────────────
 
 function genOrderOfOps(config) {
-  const { level } = config;
+  const { difficulty = 1 } = config;
+  // Promote to bracket/power forms at Hard+, and grow the operands.
+  const level = (config.level ?? 1) + (difficulty >= 3 ? 1 : 0);
+  const f = gentle(difficulty);
 
   if (level === 1) {
-    const a = randomInt(1, 10), b = randomInt(2, 9), c = randomInt(2, 9);
+    const a = randomInt(1, Math.round(10 * f)), b = randomInt(2, Math.round(9 * f)), c = randomInt(2, Math.round(9 * f));
     if (Math.random() > 0.5) {
       return { layout: 'inline', html: `<span class="prob-text">${a} + ${b} × ${c} =</span>`, answer: String(a + b * c) };
     }
     return { layout: 'inline', html: `<span class="prob-text">${a} × ${b} + ${c} =</span>`, answer: String(a * b + c) };
   }
 
-  const a = randomInt(2, 8), b = randomInt(2, 8), c = randomInt(2, 8);
+  const a = randomInt(2, Math.round(8 * f)), b = randomInt(2, Math.round(8 * f)), c = randomInt(2, Math.round(8 * f));
   const type = randomInt(0, 2);
   if (type === 0) {
     return { layout: 'inline', html: `<span class="prob-text">(${a} + ${b}) × ${c} =</span>`, answer: String((a + b) * c) };
@@ -681,12 +786,43 @@ function genOrderOfOps(config) {
 // ── Percentages ───────────────────────────────────────────────
 
 function genPercentage(config) {
-  const { level } = config;
-  const pctOptions = level === 1 ? [10, 20, 25, 50, 75] : [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80];
+  const { level, difficulty = 1 } = config;
+
+  // Hardest: two successive discounts
+  if (difficulty === 5) {
+    const p1 = randomChoice([10, 20, 25]);
+    const p2 = randomChoice([5, 10]);
+    const price = randomInt(4, 20) * 10;
+    const after1 = price * (1 - p1 / 100);
+    const final = Math.round(after1 * (1 - p2 / 100) * 100) / 100;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">An item costs $${price}. First ${p1}% off, then ${p2}% off the new price. Final price:</span>`,
+      answer: `$${final.toFixed(2)}`,
+    };
+  }
+
+  // Harder: reverse percentage
+  if (difficulty === 4) {
+    const pct = randomChoice([10, 20, 25, 50]);
+    const salePrice = randomInt(2, 20) * 5;
+    const original = salePrice * 100 / (100 - pct);
+    if (!Number.isInteger(original)) return genPercentage(config);
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">After a ${pct}% discount, the price is $${salePrice}. Original price:</span>`,
+      answer: `$${original}`,
+    };
+  }
+
+  const pctOptions = difficulty <= 2
+    ? (level === 1 ? [10, 20, 25, 50, 75] : [5, 10, 15, 20, 25, 50])
+    : [5, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 80];
   const pct = randomChoice(pctOptions);
-  const answer = randomInt(1, level === 1 ? 20 : 40);
+  const maxAns = difficulty <= 2 ? (level === 1 ? 20 : 40) : 100;
+  const answer = randomInt(1, maxAns);
   const whole = answer * (100 / pct);
-  if (!Number.isInteger(whole) || whole > 200) return genPercentage(config);
+  if (!Number.isInteger(whole) || whole > 500) return genPercentage(config);
   return {
     layout: 'inline',
     html: `<span class="prob-text">Find ${pct}% of ${whole}:</span>`,
@@ -717,7 +853,8 @@ function genFracDecPct() {
 // ── Ratios ────────────────────────────────────────────────────
 
 function genRatio(config) {
-  const { maxValue } = config;
+  const { difficulty = 1 } = config;
+  const maxValue = Math.round(config.maxValue * gentle(difficulty));
   const a = randomInt(1, maxValue), b = randomInt(1, maxValue);
   const g = gcd(a, b);
   const simA = a / g, simB = b / g;
@@ -740,9 +877,10 @@ function genRatio(config) {
 // ── Negative Numbers ──────────────────────────────────────────
 
 function genNegativeNumbers(config) {
-  const { min, max } = config;
-  const a = randomInt(min, max);
-  const b = randomInt(0, Math.abs(min));
+  const { min, max, difficulty = 1 } = config;
+  const f = steep(difficulty);
+  const a = randomInt(Math.round(min * f), Math.round(max * f));
+  const b = randomInt(0, Math.round(Math.abs(min) * f));
   const op = Math.random() > 0.5 ? '+' : '−';
   const ans = op === '+' ? a + b : a - b;
   return {
@@ -755,7 +893,11 @@ function genNegativeNumbers(config) {
 // ── Algebra: Substitution ─────────────────────────────────────
 
 function genAlgebraSubstitution(config) {
-  const { maxCoeff, maxConst, maxValue } = config;
+  const { difficulty = 1 } = config;
+  const f = gentle(difficulty);
+  const maxCoeff = Math.round(config.maxCoeff * f);
+  const maxConst = Math.round(config.maxConst * f);
+  const maxValue = Math.round(config.maxValue * f);
   const x = randomInt(1, maxValue);
   const a = randomInt(1, maxCoeff);
   const b = randomInt(0, maxConst);
@@ -770,12 +912,40 @@ function genAlgebraSubstitution(config) {
 // ── Simple Equations ──────────────────────────────────────────
 
 function genSimpleEquations(config) {
-  const { maxCoeff, maxAnswer } = config;
+  const { difficulty = 1 } = config;
+  const diffFactor = [1, 2, 3, 5, 8][difficulty - 1];
+  const maxCoeff  = Math.round((config.maxCoeff  ?? 3) * diffFactor);
+  const maxAnswer = Math.round((config.maxAnswer ?? 10) * diffFactor);
+
   const x = randomInt(1, maxAnswer);
   const a = randomInt(1, maxCoeff);
   const b = randomInt(1, maxAnswer);
-  const type = randomInt(0, 2);
 
+  // Hardest: form and solve from a word problem
+  if (difficulty === 5) {
+    const items = randomChoice(['pens', 'books', 'cards', 'marbles', 'stickers']);
+    const price = randomInt(2, 15);
+    const extra = randomInt(1, 20);
+    const total = a * price + extra;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Sam buys ${a} ${items} at $${price} each and pays a $${extra} delivery fee. Write and solve an equation for the total cost <em>T</em>:</span>`,
+      answer: `T = ${a} × ${price} + ${extra} = $${total}`,
+    };
+  }
+
+  // Harder: equation with fraction coefficient
+  if (difficulty === 4) {
+    const d = randomChoice([2, 3, 4]);
+    const ans = randomInt(1, 10) * d;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">Solve: ${frac(1, d)}<em>x</em> + ${b} = ${ans / d + b}</span>`,
+      answer: `x = ${ans}`,
+    };
+  }
+
+  const type = randomInt(0, 2);
   if (type === 0) {
     return { layout: 'inline', html: `<span class="prob-text">Solve: ${a}<em>x</em> = ${a * x}</span>`, answer: `x = ${x}` };
   }
@@ -788,7 +958,8 @@ function genSimpleEquations(config) {
 // ── Volume ────────────────────────────────────────────────────
 
 function genVolume(config) {
-  const { minSide, maxSide } = config;
+  const { minSide, difficulty = 1 } = config;
+  const maxSide = Math.round(config.maxSide * gentle(difficulty));
   const l = randomInt(minSide, maxSide);
   const w = randomInt(minSide, maxSide);
   const h = randomInt(minSide, maxSide);
@@ -802,7 +973,26 @@ function genVolume(config) {
 // ── Statistics ────────────────────────────────────────────────
 
 function genStatistics(config) {
-  const { setSize, minValue, maxValue } = config;
+  const { difficulty = 1 } = config;
+  const setSize  = config.setSize  ?? (difficulty <= 3 ? 5 : 7);
+  const minValue = config.minValue ?? 1;
+  const maxValue = config.maxValue ?? ([20, 50, 100, 200, 500][difficulty - 1]);
+
+  // Harder: find the missing value given mean
+  if (difficulty >= 4) {
+    const knownCount = setSize - 1;
+    const targetMean = randomInt(5, 30);
+    const known = Array.from({ length: knownCount }, () => randomInt(minValue, maxValue));
+    const missing = targetMean * setSize - known.reduce((s, n) => s + n, 0);
+    if (missing < 1 || missing > maxValue * 2) return genStatistics(config);
+    const dataStr = `{${known.join(', ')}, ?}`;
+    return {
+      layout: 'inline',
+      html: `<span class="prob-text">The mean of ${dataStr} is ${targetMean}. Find the missing value:</span>`,
+      answer: String(missing),
+    };
+  }
+
   const data = Array.from({ length: setSize }, () => randomInt(minValue, maxValue)).sort((a, b) => a - b);
   const mean = data.reduce((s, n) => s + n, 0) / setSize;
   const median = setSize % 2 === 0
@@ -934,7 +1124,8 @@ function genAngles(config) {
 // ── Coordinates ───────────────────────────────────────────────
 
 function genCoordinates(config) {
-  const { mode, maxCoord } = config;
+  const { mode, difficulty = 1 } = config;
+  const maxCoord = Math.round(config.maxCoord * gentle(difficulty));
   const letters = 'ABCDEFGHIJKLMNOP';
 
   if (mode === 'read') {
@@ -1015,6 +1206,139 @@ function genQuadrilateralProperties() {
   return { layout: 'inline', html: `<span class="prob-text">${q.html}</span>`, answer: q.answer };
 }
 
+// ── Analog Clock ──────────────────────────────────────────────
+
+function clockSVG(h, m) {
+  const cx = 60, cy = 60, r = 54;
+  const toRad = deg => (deg - 90) * Math.PI / 180;
+
+  const mAngle = m * 6;
+  const hAngle = (h % 12) * 30 + m * 0.5;
+
+  const mRad = toRad(mAngle), hRad = toRad(hAngle);
+  const mX = (cx + 42 * Math.cos(mRad)).toFixed(1);
+  const mY = (cy + 42 * Math.sin(mRad)).toFixed(1);
+  const hX = (cx + 28 * Math.cos(hRad)).toFixed(1);
+  const hY = (cy + 28 * Math.sin(hRad)).toFixed(1);
+
+  const ticks = Array.from({ length: 60 }, (_, i) => {
+    const a = toRad(i * 6);
+    const isHour = i % 5 === 0;
+    const inner = isHour ? r - 8 : r - 4;
+    return `<line x1="${(cx + inner * Math.cos(a)).toFixed(1)}" y1="${(cy + inner * Math.sin(a)).toFixed(1)}" x2="${(cx + r * Math.cos(a)).toFixed(1)}" y2="${(cy + r * Math.sin(a)).toFixed(1)}" stroke="#333" stroke-width="${isHour ? 2 : 1}"/>`;
+  }).join('');
+
+  const nums = Array.from({ length: 12 }, (_, i) => {
+    const n = i + 1;
+    const a = toRad(n * 30);
+    return `<text x="${(cx + 43 * Math.cos(a)).toFixed(1)}" y="${(cy + 43 * Math.sin(a) + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" font-family="sans-serif" fill="#111">${n}</text>`;
+  }).join('');
+
+  return `<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="white" stroke="#111" stroke-width="2.5"/>
+  ${ticks}
+  ${nums}
+  <line x1="${cx}" y1="${cy}" x2="${hX}" y2="${hY}" stroke="#111" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="${cx}" y1="${cy}" x2="${mX}" y2="${mY}" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="${cx}" cy="${cy}" r="3" fill="#111"/>
+</svg>`;
+}
+
+function genAnalogClock(config) {
+  const { mode } = config;
+  const h = randomInt(1, 12);
+  let m;
+  if (mode === 'oclock-halfpast') m = randomChoice([0, 30]);
+  else if (mode === 'quarter')    m = randomChoice([0, 15, 30, 45]);
+  else                            m = randomInt(0, 11) * 5;
+
+  return {
+    layout: 'clock',
+    html: clockSVG(h, m),
+    answer: `${h}:${String(m).padStart(2, '0')}`,
+  };
+}
+
+// ── Word Problems ─────────────────────────────────────────────
+
+const WP_NAMES = ['Mia', 'Liam', 'Ava', 'Noah', 'Zoe', 'Kai', 'Ruby', 'Max', 'Ivy', 'Leo', 'Ella', 'Sam'];
+const WP_ITEMS = ['apples', 'stickers', 'marbles', 'pencils', 'trading cards', 'cookies', 'books', 'shells', 'coins', 'lollies'];
+const wpInline = (html, answer) => ({ layout: 'inline', html: `<span class="prob-text">${html}</span>`, answer: String(answer) });
+
+function genWordProblem(config) {
+  const { category = 'add-sub', difficulty = 1 } = config;
+  const name = randomChoice(WP_NAMES);
+  let other = randomChoice(WP_NAMES); while (other === name) other = randomChoice(WP_NAMES);
+  const item = randomChoice(WP_ITEMS);
+  const money = c => `$${(c / 100).toFixed(2)}`;
+
+  if (category === 'add-sub') {
+    const f = steep(difficulty);
+    const a = randomInt(5, Math.round(20 * f)), b = randomInt(3, Math.round(18 * f));
+    const t = randomInt(0, 2);
+    if (t === 0) return wpInline(`${name} had ${a} ${item} and then collected ${b} more. How many ${item} does ${name} have now?`, a + b);
+    const big = Math.max(a, b), small = Math.min(a, b);
+    if (t === 1) return wpInline(`${name} had ${big} ${item} and gave ${small} to ${other}. How many ${item} are left?`, big - small);
+    return wpInline(`${name} has ${big} ${item} and ${other} has ${small}. How many more does ${name} have?`, big - small);
+  }
+
+  if (category === 'mul-div') {
+    const g = gentle(difficulty);
+    const groups = randomInt(2, Math.round(6 * g)), per = randomInt(2, Math.round(9 * g));
+    if (Math.random() > 0.5) return wpInline(`There are ${groups} boxes with ${per} ${item} in each box. How many ${item} altogether?`, groups * per);
+    return wpInline(`${groups * per} ${item} are shared equally between ${groups} children. How many does each child get?`, per);
+  }
+
+  if (category === 'money') {
+    const f = gentle(difficulty);
+    if (Math.random() > 0.5) {
+      const unit = randomInt(2, Math.round(8 * f)) * 25; // cents, multiples of 25c
+      const qty = randomInt(2, 6);
+      return wpInline(`${name} buys ${qty} ${item} costing ${money(unit)} each. How much does ${name} pay in total?`, money(unit * qty));
+    }
+    const note = randomChoice([500, 1000, 2000, 5000].filter(n => n <= 1000 * f).concat([500]));
+    const price = randomInt(Math.floor(note * 0.2), Math.floor(note * 0.9) / 5 | 0) * 5 || 5;
+    return wpInline(`${name} buys a toy for ${money(price)} and pays with a ${money(note)} note. How much change does ${name} get?`, money(note - price));
+  }
+
+  if (category === 'multi-step') {
+    const f = gentle(difficulty);
+    const qty = randomInt(2, Math.round(5 * f)), unit = randomInt(2, Math.round(6 * f)) * 50; // cents
+    const extra = randomInt(1, Math.round(8 * f)) * 100;
+    if (Math.random() > 0.5) {
+      return wpInline(`${name} buys ${qty} ${item} at ${money(unit)} each and a book for ${money(extra)}. How much does ${name} spend altogether?`, money(qty * unit + extra));
+    }
+    const spend = qty * unit;
+    const start = spend + randomInt(1, Math.round(10 * f)) * 100; // guarantee non-negative remainder
+    return wpInline(`${name} has ${money(start)}. ${name} buys ${qty} ${item} at ${money(unit)} each. How much money is left?`, money(start - spend));
+  }
+
+  // fraction-pct
+  const f = gentle(difficulty);
+  if (Math.random() > 0.5) {
+    const denom = randomChoice([2, 3, 4, 5]);
+    const numer = randomInt(1, denom - 1);
+    const groups = randomInt(2, Math.round(8 * f));
+    const total = denom * groups;
+    return wpInline(`A class has ${total} students. ${frac(numer, denom)} of them play sport. How many students play sport?`, (numer * total) / denom);
+  }
+  const pct = randomChoice([10, 20, 25, 50]);
+  const total = randomInt(1, Math.round(10 * f)) * (100 / pct);
+  return wpInline(`${Math.round(total)} people were surveyed. ${pct}% said they like maths. How many people said they like maths?`, Math.round(total * pct / 100));
+}
+
+// ── Mixed Review ──────────────────────────────────────────────
+// Draws each problem from a random sibling topic (sources injected by curriculum.js).
+
+function genMixedReview(config) {
+  const { sources, difficulty = 1 } = config;
+  if (!sources || sources.length === 0) {
+    return { layout: 'inline', html: '<span class="prob-text">No review topics configured.</span>', answer: '' };
+  }
+  const src = randomChoice(sources);
+  return generateProblem(src.type, { ...src.config, difficulty });
+}
+
 // ── Dispatcher ────────────────────────────────────────────────
 
 function generateProblem(type, config) {
@@ -1052,18 +1376,21 @@ function generateProblem(type, config) {
     case 'time':                    return genTime(config);
     case 'triangleClassify':        return genTriangleClassify();
     case 'quadrilateralProperties': return genQuadrilateralProperties();
+    case 'analogClock':             return genAnalogClock(config);
+    case 'wordProblem':             return genWordProblem(config);
+    case 'mixedReview':             return genMixedReview(config);
     default:
       return { layout: 'inline', html: '<span class="prob-text">Unknown problem type</span>', answer: '' };
   }
 }
 
-function generateCurriculumProblems(topic, count) {
+function generateCurriculumProblems(topic, count, difficulty = 1) {
   const problems = [];
   const maxAttempts = count * 30;
   let attempts = 0;
   while (problems.length < count && attempts < maxAttempts) {
     attempts++;
-    const p = generateProblem(topic.type, topic.config);
+    const p = generateProblem(topic.type, { ...topic.config, difficulty });
     if (p) problems.push(p);
   }
   return problems;

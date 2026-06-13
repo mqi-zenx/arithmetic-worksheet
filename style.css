@@ -1,6 +1,26 @@
 /* ============================
    Base / Reset
    ============================ */
+:root {
+  /* Type */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sheet: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-mono: 'SF Mono', 'Cascadia Mono', 'Courier New', monospace;
+
+  /* Colour */
+  --ink: #1f2937;
+  --ink-soft: #5b6675;
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --line: #e3e7ec;
+  --brand: #2563eb;
+  --brand-dark: #1d4ed8;
+
+  /* Shape */
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 6px 20px rgba(16, 24, 40, 0.06);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -8,19 +28,20 @@
 }
 
 body {
-  font-family: 'Georgia', serif;
-  background: #f0f0f0;
-  color: #222;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--ink);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ============================
    App Header
    ============================ */
 .app-header {
-  background: #1e293b;
+  background: linear-gradient(180deg, #1e293b 0%, #172033 100%);
   color: #fff;
   padding: 14px 24px;
   display: flex;
@@ -28,12 +49,18 @@ body {
   justify-content: space-between;
   gap: 16px;
   flex-shrink: 0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 .app-header h1 {
   font-size: 1.15rem;
-  font-weight: bold;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.app-header h1::before {
+  content: "✏️";
+  margin-right: 8px;
 }
 
 /* ============================
@@ -49,10 +76,10 @@ body {
    Sidebar
    ============================ */
 .sidebar {
-  width: 240px;
+  width: 248px;
   flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #ddd;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -107,6 +134,12 @@ body {
 }
 
 .topic-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font-family: inherit;
   padding: 9px 10px;
   border-radius: 5px;
   font-size: 0.85rem;
@@ -158,25 +191,81 @@ body {
   text-align: center;
 }
 
-.btn-generate {
-  width: 100%;
-  padding: 10px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.15s;
+.difficulty-row {
+  margin-bottom: 10px;
 }
 
-.btn-generate:hover { background: #1d4ed8; }
+.difficulty-row.disabled {
+  opacity: 0.45;
+}
 
-.btn-print {
+.difficulty-row.disabled .diff-btn {
+  cursor: not-allowed;
+}
+
+.difficulty-label {
+  display: block;
+  font-size: 0.83rem;
+  font-weight: bold;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.difficulty-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.diff-btn {
+  flex: 1;
+  padding: 5px 2px;
+  font-size: 0.7rem;
+  font-family: inherit;
+  font-weight: 600;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.diff-btn:hover { background: #e5e7eb; }
+
+.diff-btn.active[data-level="1"] { background: #16a34a; color: #fff; border-color: #16a34a; }
+.diff-btn.active[data-level="2"] { background: #2563eb; color: #fff; border-color: #2563eb; }
+.diff-btn.active[data-level="3"] { background: #d97706; color: #fff; border-color: #d97706; }
+.diff-btn.active[data-level="4"] { background: #dc2626; color: #fff; border-color: #dc2626; }
+.diff-btn.active[data-level="5"] { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+.btn-generate {
+  width: 100%;
+  padding: 11px;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+
+.btn-generate:hover { background: var(--brand-dark); }
+.btn-generate:active { transform: translateY(1px); }
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-print,
+.btn-answers {
   padding: 8px 20px;
-  background: #16a34a;
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -188,8 +277,13 @@ body {
   white-space: nowrap;
 }
 
+.btn-print   { background: #16a34a; }
 .btn-print:hover   { background: #15803d; }
 .btn-print:disabled { background: #6b7280; cursor: not-allowed; }
+
+.btn-answers { background: #475569; }
+.btn-answers:hover { background: #334155; }
+.btn-answers:disabled { background: #6b7280; cursor: not-allowed; }
 
 .error-msg {
   color: #dc2626;
@@ -208,20 +302,29 @@ body {
 }
 
 .worksheet {
-  background: #fff;
+  background: var(--surface);
   max-width: 780px;
   margin: 0 auto;
-  padding: 32px 40px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 36px 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-family: var(--font-sheet);
 }
 
 .worksheet.empty {
   text-align: center;
-  padding: 80px 40px;
-  color: #aaa;
+  padding: 88px 40px;
+  color: var(--ink-soft);
   font-size: 1rem;
-  font-style: italic;
+  font-family: var(--font-ui);
+}
+
+.worksheet.empty::before {
+  content: "📝";
+  display: block;
+  font-size: 2.4rem;
+  margin-bottom: 12px;
 }
 
 /* ============================
@@ -275,7 +378,7 @@ body {
   flex-direction: column;
   align-items: flex-end;
   font-size: 1.1rem;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   min-width: 80px;
   position: relative;
   padding-top: 14px;
@@ -287,7 +390,7 @@ body {
   left: 0;
   font-size: 0.7rem;
   color: #888;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-sheet);
 }
 
 .problem .operand-a  { padding-right: 4px; }
@@ -325,7 +428,7 @@ body {
 .ld-layout {
   display: inline-flex;
   flex-direction: column;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 1.1rem;
 }
 
@@ -363,7 +466,7 @@ body {
   flex-shrink: 0;
   font-size: 0.7rem;
   color: #888;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-sheet);
   line-height: 1.6;
   min-width: 18px;
 }
@@ -377,7 +480,7 @@ body {
 
 .prob-text {
   font-size: 0.97rem;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-sheet);
   line-height: 1.5;
 }
 
@@ -392,6 +495,109 @@ body {
   width: 100%;
   height: 24px;
   border-bottom: 1px solid #bbb;
+}
+
+/* ── Clock problems ─────────────────────────────────────────── */
+
+.problem-grid.cols-2-clock { grid-template-columns: repeat(2, 1fr); gap: 24px 40px; }
+
+.clock-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.clock-problem .problem-number {
+  position: static;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: #888;
+  font-family: var(--font-sheet);
+  line-height: 1.6;
+  min-width: 18px;
+}
+
+.clock-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.clock-body svg { display: block; }
+
+.clock-body .prob-answer-line { width: 120px; }
+
+/* ============================
+   Focus visibility (keyboard users)
+   ============================ */
+.year-tab:focus-visible,
+.topic-item:focus-visible,
+.diff-btn:focus-visible,
+.btn-generate:focus-visible,
+.btn-print:focus-visible,
+.btn-answers:focus-visible,
+.count-label input:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* ============================
+   Responsive (tablet / mobile)
+   ============================ */
+@media (max-width: 760px) {
+  .app-layout { flex-direction: column; }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    max-height: 50vh;
+  }
+
+  /* Year tabs become a horizontally scrolling strip. */
+  .year-tabs { flex-direction: row; overflow-x: auto; }
+  .year-tab { border-bottom: none; border-right: 1px solid #e5e7eb; white-space: nowrap; }
+
+  .worksheet-area { padding: 16px 12px; }
+  .worksheet { padding: 20px 16px; }
+
+  /* Reflow dense grids so problems stay legible on a phone. */
+  .problem-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .problem-grid.cols-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .problem-grid.cols-2,
+  .problem-grid.cols-4,
+  .problem-grid.cols-3 { grid-template-columns: 1fr; }
+  .header-actions { gap: 6px; }
+  .btn-print, .btn-answers { padding: 8px 12px; font-size: 0.8rem; }
+}
+
+/* ============================
+   Answer Key
+   ============================ */
+.answer-key {
+  display: none;
+  color: #c1121f;
+  font-weight: bold;
+}
+
+/* Column answers sit in the answer box; inline/clock answers sit on the line. */
+.worksheet.show-answers .answer-key { display: inline-block; }
+
+.problem-answer .answer-key {
+  font-family: var(--font-mono);
+  padding-top: 2px;
+}
+
+.prob-answer-line .answer-key,
+.ld-answer-space .answer-key {
+  padding: 0 2px;
 }
 
 /* ============================
