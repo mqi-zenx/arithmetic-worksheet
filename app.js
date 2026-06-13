@@ -6,6 +6,7 @@ const sidebarCtrls   = document.getElementById('sidebar-controls');
 const countInput     = document.getElementById('count-input');
 const generateBtn    = document.getElementById('btn-generate');
 const printBtn       = document.getElementById('btn-print');
+const answersBtn     = document.getElementById('btn-answers');
 const errorMsg       = document.getElementById('error-msg');
 const worksheetEl    = document.getElementById('worksheet');
 
@@ -83,10 +84,21 @@ generateBtn.addEventListener('click', () => {
 
   renderWorksheet(activeTopic, problems);
   printBtn.disabled = false;
+  answersBtn.disabled = false;
+  // New worksheet always starts with answers hidden.
+  worksheetEl.classList.remove('show-answers');
+  answersBtn.textContent = 'Show Answers';
+  answersBtn.setAttribute('aria-pressed', 'false');
   worksheetEl.scrollIntoView({ behavior: 'smooth' });
 });
 
 printBtn.addEventListener('click', () => window.print());
+
+answersBtn.addEventListener('click', () => {
+  const showing = worksheetEl.classList.toggle('show-answers');
+  answersBtn.textContent = showing ? 'Hide Answers' : 'Show Answers';
+  answersBtn.setAttribute('aria-pressed', String(showing));
+});
 
 // ── Select first year on load ─────────────────────────────────
 
@@ -133,6 +145,8 @@ function renderWorksheet(topic, problems) {
 }
 
 function renderProblem(p, num) {
+  const key = `<span class="answer-key">${p.answer}</span>`;
+
   if (p.layout === 'column') {
     return `
       <div class="problem">
@@ -143,7 +157,7 @@ function renderProblem(p, num) {
           <span class="operand-b">${p.operandB}</span>
         </div>
         <div class="problem-line"></div>
-        <div class="problem-answer"></div>
+        <div class="problem-answer">${key}</div>
       </div>`;
   }
 
@@ -152,7 +166,7 @@ function renderProblem(p, num) {
       <div class="problem ld-problem">
         <span class="problem-number">${num}</span>
         <div class="ld-layout">
-          <div class="ld-answer-space"></div>
+          <div class="ld-answer-space">${key}</div>
           <div class="ld-bottom">
             <span class="ld-divisor">${p.operandB}</span>
             <div class="ld-box">
@@ -169,7 +183,7 @@ function renderProblem(p, num) {
         <span class="problem-number">${num}</span>
         <div class="clock-body">
           ${p.html}
-          <div class="prob-answer-line"></div>
+          <div class="prob-answer-line">${key}</div>
         </div>
       </div>`;
   }
@@ -180,7 +194,7 @@ function renderProblem(p, num) {
       <span class="problem-number">${num}</span>
       <div class="inline-body">
         ${p.html}
-        <div class="prob-answer-line"></div>
+        <div class="prob-answer-line">${key}</div>
       </div>
     </div>`;
 }

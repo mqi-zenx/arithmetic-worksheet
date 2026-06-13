@@ -215,9 +215,15 @@ body {
 
 .btn-generate:hover { background: #1d4ed8; }
 
-.btn-print {
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-print,
+.btn-answers {
   padding: 8px 20px;
-  background: #16a34a;
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -229,8 +235,13 @@ body {
   white-space: nowrap;
 }
 
+.btn-print   { background: #16a34a; }
 .btn-print:hover   { background: #15803d; }
 .btn-print:disabled { background: #6b7280; cursor: not-allowed; }
+
+.btn-answers { background: #475569; }
+.btn-answers:hover { background: #334155; }
+.btn-answers:disabled { background: #6b7280; cursor: not-allowed; }
 
 .error-msg {
   color: #dc2626;
@@ -467,6 +478,28 @@ body {
 .clock-body svg { display: block; }
 
 .clock-body .prob-answer-line { width: 120px; }
+
+/* ============================
+   Answer Key
+   ============================ */
+.answer-key {
+  display: none;
+  color: #c1121f;
+  font-weight: bold;
+}
+
+/* Column answers sit in the answer box; inline/clock answers sit on the line. */
+.worksheet.show-answers .answer-key { display: inline-block; }
+
+.problem-answer .answer-key {
+  font-family: 'Courier New', monospace;
+  padding-top: 2px;
+}
+
+.prob-answer-line .answer-key,
+.ld-answer-space .answer-key {
+  padding: 0 2px;
+}
 
 /* ============================
    Print Styles
