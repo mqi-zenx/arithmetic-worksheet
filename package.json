@@ -1,0 +1,9 @@
+{
+  "name": "arithmetic-worksheet",
+  "version": "1.0.0",
+  "description": "K–6 maths curriculum worksheet generator",
+  "private": true,
+  "scripts": {
+    "test": "node test/audit.test.js"
+  }
+}

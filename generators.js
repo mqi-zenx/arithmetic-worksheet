@@ -431,13 +431,18 @@ function genFractionArithmetic(config) {
       const ans = rem === 0 ? String(whole) : `${whole} ${fractionToString(sn, sd)}`;
       return { layout: 'inline', html: `<span class="prob-text">${w1} ${frac(n1, d)} + ${w2} ${frac(n2, d)} =</span>`, answer: ans };
     }
-    const big = w1 >= w2 ? [w1, n1] : [w2, n2];
-    const small = w1 >= w2 ? [w2, n2] : [w1, n1];
-    let rN = big[1] - small[1], rW = big[0] - small[0];
-    if (rN < 0) { rN += d; rW -= 1; }
-    const [sn, sd] = rN === 0 ? [0, 1] : simplifyFraction(rN, d);
-    const ans = rN === 0 ? String(rW) : `${rW} ${fractionToString(sn, sd)}`;
-    return { layout: 'inline', html: `<span class="prob-text">${big[0]} ${frac(big[1], d)} − ${small[0]} ${frac(small[1], d)} =</span>`, answer: ans };
+    // Subtraction: order operands by total value so the result is never negative,
+    // then subtract via improper fractions (avoids the equal-whole borrow bug).
+    const i1 = w1 * d + n1, i2 = w2 * d + n2;
+    const hi = i1 >= i2 ? [w1, n1] : [w2, n2];
+    const lo = i1 >= i2 ? [w2, n2] : [w1, n1];
+    const diff = Math.abs(i1 - i2);
+    const whole = Math.floor(diff / d), rem = diff % d;
+    const [sn, sd] = rem === 0 ? [0, 1] : simplifyFraction(rem, d);
+    const ans = rem === 0
+      ? String(whole)
+      : (whole === 0 ? fractionToString(sn, sd) : `${whole} ${fractionToString(sn, sd)}`);
+    return { layout: 'inline', html: `<span class="prob-text">${hi[0]} ${frac(hi[1], d)} − ${lo[0]} ${frac(lo[1], d)} =</span>`, answer: ans };
   }
 
   if (operation === '×') {
