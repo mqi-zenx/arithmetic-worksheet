@@ -1386,12 +1386,40 @@ function generateProblem(type, config) {
 
 function generateCurriculumProblems(topic, count, difficulty = 1) {
   const problems = [];
-  const maxAttempts = count * 30;
+  const seen = new Set();
+  // Cap attempts so a topic with a small question space can't spin forever.
+  const maxAttempts = count * 40;
   let attempts = 0;
+
+  // First pass: only accept problems we haven't already produced.
   while (problems.length < count && attempts < maxAttempts) {
     attempts++;
     const p = generateProblem(topic.type, { ...topic.config, difficulty });
-    if (p) problems.push(p);
+    if (!p) continue;
+    const sig = problemSignature(p);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    problems.push(p);
   }
+
+  // Fallback: if the unique space is smaller than `count` (e.g. fixed question
+  // banks), top up with whatever we can rather than returning a short sheet.
+  while (problems.length < count) {
+    const p = generateProblem(topic.type, { ...topic.config, difficulty });
+    if (p) problems.push(p);
+    else break;
+  }
+
   return problems;
+}
+
+// A stable fingerprint of a problem's question, used to avoid duplicates on one
+// sheet. Column/long-division problems are keyed by their operands; everything
+// else is keyed by the rendered question text (the clock SVG encodes its time,
+// so identical times collapse to the same signature too).
+function problemSignature(p) {
+  if (p.operandA !== undefined && p.operator !== undefined) {
+    return `${p.layout}|${p.operandA}|${p.operator}|${p.operandB}`;
+  }
+  return `${p.layout}|${p.html ?? ''}`;
 }

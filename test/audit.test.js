@@ -18,7 +18,15 @@ const src = [
 ].join('\n');
 vm.runInContext(src, sandbox);
 
-const { CURRICULUM, generateProblem } = sandbox.__api;
+const { CURRICULUM, generateProblem, generateCurriculumProblems } = sandbox.__api;
+
+// Mirror of generators.js problemSignature — keep in sync.
+function sigOf(p) {
+  if (p.operandA !== undefined && p.operator !== undefined) {
+    return `${p.layout}|${p.operandA}|${p.operator}|${p.operandB}`;
+  }
+  return `${p.layout}|${p.html ?? ''}`;
+}
 const stripTags = s => String(s).replace(/<[^>]+>/g, '');
 const decode = s => stripTags(s).replace(/&nbsp;/g, ' ').trim();
 
@@ -229,6 +237,36 @@ const flat = growth.filter(g => g.hi === g.lo).map(g => g.id);
 const grew = growth.filter(g => g.hi > g.lo).length;
 console.log(`\nDifficulty responsiveness: ${grew}/${growth.length} aware topics grow with difficulty.`);
 if (flat.length) console.log(`  Flat (acceptable, bounded topics): ${flat.join(', ')}`);
+
+// ── Duplicate-prevention probe ────────────────────────────────
+// A generated sheet must contain no duplicate questions, *unless* the topic's
+// unique question space is smaller than the requested count (fixed question
+// banks, tiny domains). We estimate the true space by heavy single-sampling,
+// then require full uniqueness whenever the request comfortably fits inside it.
+const DUP_COUNT = 15;
+let dupChecked = 0;
+for (const year of CURRICULUM) {
+  for (const topic of year.topics) {
+    for (let diff = 1; diff <= 5; diff++) {
+      // Estimate the unique space at this difficulty.
+      const space = new Set();
+      for (let i = 0; i < 800; i++) {
+        let p; try { p = generateProblem(topic.type, { ...topic.config, difficulty: diff }); } catch { continue; }
+        if (p) space.add(sigOf(p));
+      }
+      const sheet = generateCurriculumProblems(topic, DUP_COUNT, diff);
+      const uniqueOnSheet = new Set(sheet.map(sigOf)).size;
+      dupChecked++;
+      // Only enforce zero-dupes when the space is clearly larger than the ask
+      // (×2 margin absorbs sampling noise on medium-sized domains).
+      if (space.size >= DUP_COUNT * 2 && uniqueOnSheet < sheet.length) {
+        fail(topic.id, diff, 'DUPLICATE',
+          `sheet of ${sheet.length} had ${sheet.length - uniqueOnSheet} dupe(s); est. space ~${space.size}`);
+      }
+    }
+  }
+}
+console.log(`Duplicate prevention: checked ${dupChecked} topic/difficulty sheets.`);
 
 // ── Report ────────────────────────────────────────────────────
 console.log(`\nGenerated & checked ${total} problems across ${CURRICULUM.reduce((s, y) => s + y.topics.length, 0)} topics × 5 difficulties.`);
