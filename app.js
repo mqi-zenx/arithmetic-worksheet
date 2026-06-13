@@ -188,7 +188,7 @@ printKeyBtn.addEventListener('click', () => {
 
   const cols = Math.min(5, Math.max(3, Math.ceil(Math.sqrt(lastProblems.length))));
   const rows = lastProblems.map((p, i) =>
-    `<div class="ai"><span class="an">${i + 1}.</span><span class="av">${escapeHtml(p.answer)}</span></div>`
+    `<div class="ai"><span class="an">${i + 1}.</span><span class="av">${p.answer}</span></div>`
   ).join('');
 
   const html = `<!DOCTYPE html>
