@@ -162,6 +162,14 @@ body {
   margin-bottom: 10px;
 }
 
+.difficulty-row.disabled {
+  opacity: 0.45;
+}
+
+.difficulty-row.disabled .diff-btn {
+  cursor: not-allowed;
+}
+
 .difficulty-label {
   display: block;
   font-size: 0.83rem;

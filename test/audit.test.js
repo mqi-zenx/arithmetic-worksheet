@@ -14,7 +14,7 @@ vm.createContext(sandbox);
 const src = [
   fs.readFileSync(path.join(root, 'curriculum.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'generators.js'), 'utf8'),
-  'globalThis.__api = { CURRICULUM, generateProblem, generateCurriculumProblems };',
+  'globalThis.__api = { CURRICULUM, generateProblem, generateCurriculumProblems, DIFFICULTY_AWARE_TYPES };',
 ].join('\n');
 vm.runInContext(src, sandbox);
 
@@ -188,6 +188,41 @@ for (const year of CURRICULUM) {
     }
   }
 }
+
+// ── Difficulty responsiveness probe ───────────────────────────
+// For every difficulty-aware topic, the largest number seen at Hardest should
+// never be smaller than at Easy (catches inverted/no-op scaling). Growth is
+// reported for a sanity eyeball; flat (e.g. prime classification, capped) is OK.
+const AWARE = sandbox.__api.DIFFICULTY_AWARE_TYPES || new Set();
+// These intentionally trade magnitude for complexity at higher levels
+// (mixed numbers, reverse %, word problems, compound shapes), so a drop in the
+// largest number is expected and must not be treated as an inversion bug.
+const TYPE_SWITCHERS = new Set(['fractionArithmetic', 'percentage', 'simpleEquations', 'area']);
+const maxToken = (type, cfg, d) => {
+  let mx = 0;
+  for (let i = 0; i < 400; i++) {
+    let p; try { p = generateProblem(type, { ...cfg, difficulty: d }); } catch { continue; }
+    const text = decode(`${p.html ?? ''} ${p.operandA ?? ''} ${p.operandB ?? ''}`).replace(/,/g, '');
+    for (const n of text.match(/\d+(?:\.\d+)?/g) || []) mx = Math.max(mx, parseFloat(n));
+  }
+  return mx;
+};
+const growth = [];
+for (const year of CURRICULUM) {
+  for (const topic of year.topics) {
+    if (!AWARE.has(topic.type)) continue;
+    const lo = maxToken(topic.type, topic.config, 1);
+    const hi = maxToken(topic.type, topic.config, 5);
+    growth.push({ id: topic.id, lo, hi });
+    if (hi < lo && !TYPE_SWITCHERS.has(topic.type)) {
+      fail(topic.id, '1→5', 'INVERTED_SCALING', `max@easy=${lo} > max@hardest=${hi}`);
+    }
+  }
+}
+const flat = growth.filter(g => g.hi === g.lo).map(g => g.id);
+const grew = growth.filter(g => g.hi > g.lo).length;
+console.log(`\nDifficulty responsiveness: ${grew}/${growth.length} aware topics grow with difficulty.`);
+if (flat.length) console.log(`  Flat (acceptable, bounded topics): ${flat.join(', ')}`);
 
 // ── Report ────────────────────────────────────────────────────
 console.log(`\nGenerated & checked ${total} problems across ${CURRICULUM.reduce((s, y) => s + y.topics.length, 0)} topics × 5 difficulties.`);

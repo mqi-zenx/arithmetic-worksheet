@@ -64,6 +64,20 @@ function selectTopic(topic) {
   });
 
   countInput.value = topic.defaultCount;
+
+  // Gate the difficulty control: only show it as active for generators that
+  // actually respond to difficulty, so the selector never silently does nothing.
+  const supportsDifficulty = DIFFICULTY_AWARE_TYPES.has(topic.type);
+  const diffRow = document.querySelector('.difficulty-row');
+  const diffButtons = document.querySelectorAll('.diff-btn');
+  diffRow.classList.toggle('disabled', !supportsDifficulty);
+  diffRow.title = supportsDifficulty ? '' : 'This topic has a fixed difficulty.';
+  diffButtons.forEach(b => { b.disabled = !supportsDifficulty; });
+  if (!supportsDifficulty) {
+    currentDifficulty = 1;
+    diffButtons.forEach(b => b.classList.toggle('active', b.dataset.level === '1'));
+  }
+
   sidebarCtrls.style.display = '';
   generateBtn.focus();
 }
