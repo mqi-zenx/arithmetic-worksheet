@@ -23,6 +23,7 @@ document.getElementById('difficulty-btns').addEventListener('click', e => {
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  saveState();
 });
 
 // ── Build year tabs ───────────────────────────────────────────
@@ -100,6 +101,7 @@ function selectTopic(topic) {
 
   sidebarCtrls.style.display = '';
   generateBtn.focus();
+  saveState();
 }
 
 // ── Generate ──────────────────────────────────────────────────
@@ -127,6 +129,7 @@ generateBtn.addEventListener('click', () => {
 });
 
 printBtn.addEventListener('click', () => window.print());
+countInput.addEventListener('change', saveState);
 
 answersBtn.addEventListener('click', () => {
   const showing = worksheetEl.classList.toggle('show-answers');
@@ -134,9 +137,47 @@ answersBtn.addEventListener('click', () => {
   answersBtn.setAttribute('aria-pressed', String(showing));
 });
 
-// ── Select first year on load ─────────────────────────────────
+// ── Persistence (remember last selection) ─────────────────────
 
-if (CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
+const LS_KEY = 'aw:lastState';
+
+function saveState() {
+  if (!activeTopic) return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      yearId: activeYear && activeYear.id,
+      topicId: activeTopic.id,
+      difficulty: currentDifficulty,
+      count: parseInt(countInput.value, 10) || activeTopic.defaultCount,
+    }));
+  } catch (e) { /* storage unavailable (private mode) — ignore */ }
+}
+
+function restoreState() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { return false; }
+  if (!s) return false;
+  const year = CURRICULUM.find(y => y.id === s.yearId);
+  if (!year) return false;
+  selectYear(year);
+  const topic = year.topics.find(t => t.id === s.topicId);
+  if (!topic) return false;
+  selectTopic(topic);
+  if (DIFFICULTY_AWARE_TYPES.has(topic.type) && s.difficulty) {
+    currentDifficulty = s.difficulty;
+    document.querySelectorAll('.diff-btn').forEach(b => {
+      const on = Number(b.dataset.level) === s.difficulty;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  if (s.count) countInput.value = s.count;
+  return true;
+}
+
+// ── Restore last session, or select the first year ───────────
+
+if (!restoreState() && CURRICULUM.length > 0) selectYear(CURRICULUM[0]);
 
 // ── Render worksheet ──────────────────────────────────────────
 
