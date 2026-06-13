@@ -6,13 +6,19 @@ const sidebarCtrls   = document.getElementById('sidebar-controls');
 const countInput     = document.getElementById('count-input');
 const generateBtn    = document.getElementById('btn-generate');
 const printBtn       = document.getElementById('btn-print');
+const printKeyBtn    = document.getElementById('btn-print-key');
 const answersBtn     = document.getElementById('btn-answers');
 const errorMsg       = document.getElementById('error-msg');
 const worksheetEl    = document.getElementById('worksheet');
+const topicSearchEl  = document.getElementById('topic-search');
+const printSettings  = document.getElementById('print-settings');
+const printColsEl    = document.getElementById('print-cols');
+const printSizeEl    = document.getElementById('print-size');
 
 let activeYear        = null;
 let activeTopic       = null;
 let currentDifficulty = 1;
+let lastProblems      = [];
 
 document.getElementById('difficulty-btns').addEventListener('click', e => {
   const btn = e.target.closest('.diff-btn');
@@ -41,11 +47,40 @@ CURRICULUM.forEach(year => {
   yearTabsEl.appendChild(btn);
 });
 
+// ── Topic search/filter ───────────────────────────────────────
+
+topicSearchEl.addEventListener('input', () => {
+  const q = topicSearchEl.value.toLowerCase().trim();
+  let visibleCount = 0;
+  topicListEl.querySelectorAll('li').forEach(li => {
+    const text = li.querySelector('.topic-item').textContent.toLowerCase();
+    const hidden = q !== '' && !text.includes(q);
+    li.hidden = hidden;
+    if (!hidden) visibleCount++;
+  });
+  // Show/hide "no results" hint
+  let noResults = topicListEl.querySelector('.topic-no-results');
+  if (q && visibleCount === 0) {
+    if (!noResults) {
+      noResults = document.createElement('li');
+      noResults.className = 'topic-no-results';
+      noResults.textContent = 'No topics match.';
+      topicListEl.appendChild(noResults);
+    }
+    noResults.hidden = false;
+  } else if (noResults) {
+    noResults.hidden = true;
+  }
+});
+
 function selectYear(year) {
   activeYear = year;
   activeTopic = null;
   sidebarCtrls.style.display = 'none';
   errorMsg.textContent = '';
+  // Clear search when switching years
+  topicSearchEl.value = '';
+  topicListEl.querySelectorAll('li').forEach(li => { li.hidden = false; });
 
   document.querySelectorAll('.year-tab').forEach(b => {
     const on = b.dataset.yearId === year.id;
@@ -119,8 +154,11 @@ generateBtn.addEventListener('click', () => {
   }
 
   renderWorksheet(activeTopic, problems);
+  lastProblems = problems;
   printBtn.disabled = false;
+  printKeyBtn.disabled = false;
   answersBtn.disabled = false;
+  printSettings.style.display = '';
   // New worksheet always starts with answers hidden.
   worksheetEl.classList.remove('show-answers');
   answersBtn.textContent = 'Show Answers';
@@ -130,6 +168,76 @@ generateBtn.addEventListener('click', () => {
 
 printBtn.addEventListener('click', () => window.print());
 countInput.addEventListener('change', saveState);
+
+// ── Print settings → write data attrs consumed by @media print CSS ────
+
+function applyPrintSettings() {
+  document.body.dataset.printCols = printColsEl.value;
+  document.body.dataset.printSize = printSizeEl.value;
+}
+printColsEl.addEventListener('change', applyPrintSettings);
+printSizeEl.addEventListener('change', applyPrintSettings);
+
+// ── Print Answer Key (opens a separate window/tab) ────────────
+
+printKeyBtn.addEventListener('click', () => {
+  if (!lastProblems.length || !activeTopic) return;
+  const yearLabel = CURRICULUM.find(y => y.topics.some(t => t.id === activeTopic.id))?.label ?? '';
+  const diffLabel = ['Easy', 'Medium', 'Hard', 'Harder', 'Hardest'][currentDifficulty - 1];
+  const title = `${yearLabel} — ${activeTopic.label} (${diffLabel})`;
+
+  const cols = Math.min(5, Math.max(3, Math.ceil(Math.sqrt(lastProblems.length))));
+  const rows = lastProblems.map((p, i) =>
+    `<div class="ai"><span class="an">${i + 1}.</span><span class="av">${escapeHtml(p.answer)}</span></div>`
+  ).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Answer Key — ${escapeHtml(title)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, 'Times New Roman', serif; padding: 1.8cm 2.2cm; color: #111; }
+  h1 { font-size: 1rem; font-weight: bold; letter-spacing: .02em; margin-bottom: .2em; }
+  h2 { font-size: .82rem; color: #555; font-weight: normal; margin-bottom: 1.4em; }
+  .grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 6px 18px; }
+  .ai { display: flex; align-items: baseline; gap: 5px; font-size: .9rem; padding: 3px 0; border-bottom: 1px solid #eee; }
+  .an { color: #888; min-width: 26px; font-size: .75rem; flex-shrink: 0; }
+  .av { font-weight: bold; color: #c1121f; }
+  @media print {
+    @page { size: A4 portrait; margin: 1.5cm 2cm; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<h1>Answer Key</h1>
+<h2>${escapeHtml(title)}</h2>
+<div class="grid">${rows}</div>
+<script>
+  window.onload = function() { window.print(); };
+<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=740,height=600');
+  if (!w) {
+    alert('Please allow pop-ups to open the answer key in a new tab.');
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+});
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 answersBtn.addEventListener('click', () => {
   const showing = worksheetEl.classList.toggle('show-answers');

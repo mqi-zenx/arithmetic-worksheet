@@ -12,6 +12,7 @@
     <h1>K–6 Maths Curriculum</h1>
     <div class="header-actions">
       <button class="btn-answers" id="btn-answers" disabled>Show Answers</button>
+      <button class="btn-print-key" id="btn-print-key" disabled>Print Answer Key</button>
       <button class="btn-print" id="btn-print" disabled>Print Worksheet</button>
     </div>
   </header>
@@ -23,6 +24,9 @@
       <nav class="year-tabs" id="year-tabs" role="tablist"></nav>
 
       <div class="sidebar-body">
+        <div class="topic-search-wrap">
+          <input type="search" id="topic-search" placeholder="Search topics…" autocomplete="off" aria-label="Search topics" />
+        </div>
         <ul class="topic-list" id="topic-list" aria-label="Topics"></ul>
 
         <div class="sidebar-controls" id="sidebar-controls" style="display:none">
@@ -42,6 +46,29 @@
           </div>
           <button type="button" class="btn-generate" id="btn-generate">Generate Worksheet</button>
           <p class="error-msg" id="error-msg" role="alert"></p>
+
+          <details class="print-settings" id="print-settings" style="display:none">
+            <summary class="print-settings-toggle">Print settings</summary>
+            <div class="print-settings-body">
+              <label class="ps-label">
+                <span>Columns</span>
+                <select id="print-cols">
+                  <option value="auto">Auto</option>
+                  <option value="2">2 columns</option>
+                  <option value="3">3 columns</option>
+                  <option value="4">4 columns</option>
+                </select>
+              </label>
+              <label class="ps-label">
+                <span>Size</span>
+                <select id="print-size">
+                  <option value="normal">Normal</option>
+                  <option value="compact">Compact (more per page)</option>
+                  <option value="large">Large (easier to read)</option>
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
       </div>
     </aside>
