@@ -16,18 +16,25 @@ let currentDifficulty = 1;
 
 document.getElementById('difficulty-btns').addEventListener('click', e => {
   const btn = e.target.closest('.diff-btn');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   currentDifficulty = parseInt(btn.dataset.level, 10);
-  document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    const on = b === btn;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
 });
 
 // ── Build year tabs ───────────────────────────────────────────
 
 CURRICULUM.forEach(year => {
   const btn = document.createElement('button');
+  btn.type = 'button';
   btn.className = 'year-tab';
   btn.textContent = year.label;
   btn.dataset.yearId = year.id;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-selected', 'false');
   btn.style.setProperty('--year-color', year.color);
   btn.addEventListener('click', () => selectYear(year));
   yearTabsEl.appendChild(btn);
@@ -40,17 +47,24 @@ function selectYear(year) {
   errorMsg.textContent = '';
 
   document.querySelectorAll('.year-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.yearId === year.id);
+    const on = b.dataset.yearId === year.id;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
   });
 
   topicListEl.innerHTML = '';
   year.topics.forEach(topic => {
     const li = document.createElement('li');
-    li.className = 'topic-item';
-    li.textContent = topic.label;
-    li.dataset.topicId = topic.id;
-    li.style.setProperty('--year-color', year.color);
-    li.addEventListener('click', () => selectTopic(topic));
+    li.setAttribute('role', 'none');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'topic-item';
+    btn.textContent = topic.label;
+    btn.dataset.topicId = topic.id;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.style.setProperty('--year-color', year.color);
+    btn.addEventListener('click', () => selectTopic(topic));
+    li.appendChild(btn);
     topicListEl.appendChild(li);
   });
 }
@@ -59,8 +73,10 @@ function selectTopic(topic) {
   activeTopic = topic;
   errorMsg.textContent = '';
 
-  document.querySelectorAll('.topic-item').forEach(li => {
-    li.classList.toggle('active', li.dataset.topicId === topic.id);
+  document.querySelectorAll('.topic-item').forEach(el => {
+    const on = el.dataset.topicId === topic.id;
+    el.classList.toggle('active', on);
+    el.setAttribute('aria-pressed', String(on));
   });
 
   countInput.value = topic.defaultCount;
@@ -75,7 +91,11 @@ function selectTopic(topic) {
   diffButtons.forEach(b => { b.disabled = !supportsDifficulty; });
   if (!supportsDifficulty) {
     currentDifficulty = 1;
-    diffButtons.forEach(b => b.classList.toggle('active', b.dataset.level === '1'));
+    diffButtons.forEach(b => {
+      const on = b.dataset.level === '1';
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
   }
 
   sidebarCtrls.style.display = '';

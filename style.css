@@ -107,6 +107,12 @@ body {
 }
 
 .topic-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font-family: inherit;
   padding: 9px 10px;
   border-radius: 5px;
   font-size: 0.85rem;
@@ -486,6 +492,54 @@ body {
 .clock-body svg { display: block; }
 
 .clock-body .prob-answer-line { width: 120px; }
+
+/* ============================
+   Focus visibility (keyboard users)
+   ============================ */
+.year-tab:focus-visible,
+.topic-item:focus-visible,
+.diff-btn:focus-visible,
+.btn-generate:focus-visible,
+.btn-print:focus-visible,
+.btn-answers:focus-visible,
+.count-label input:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* ============================
+   Responsive (tablet / mobile)
+   ============================ */
+@media (max-width: 760px) {
+  .app-layout { flex-direction: column; }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    max-height: 50vh;
+  }
+
+  /* Year tabs become a horizontally scrolling strip. */
+  .year-tabs { flex-direction: row; overflow-x: auto; }
+  .year-tab { border-bottom: none; border-right: 1px solid #e5e7eb; white-space: nowrap; }
+
+  .worksheet-area { padding: 16px 12px; }
+  .worksheet { padding: 20px 16px; }
+
+  /* Reflow dense grids so problems stay legible on a phone. */
+  .problem-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .problem-grid.cols-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .problem-grid.cols-2,
+  .problem-grid.cols-4,
+  .problem-grid.cols-3 { grid-template-columns: 1fr; }
+  .header-actions { gap: 6px; }
+  .btn-print, .btn-answers { padding: 8px 12px; font-size: 0.8rem; }
+}
 
 /* ============================
    Answer Key

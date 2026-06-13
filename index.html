@@ -23,25 +23,25 @@
       <nav class="year-tabs" id="year-tabs" role="tablist"></nav>
 
       <div class="sidebar-body">
-        <ul class="topic-list" id="topic-list"></ul>
+        <ul class="topic-list" id="topic-list" aria-label="Topics"></ul>
 
         <div class="sidebar-controls" id="sidebar-controls" style="display:none">
           <label class="count-label" for="count-input">
             Problems
             <input type="number" id="count-input" min="1" max="60" value="20" />
           </label>
-          <div class="difficulty-row">
-            <span class="difficulty-label">Difficulty</span>
-            <div class="difficulty-btns" id="difficulty-btns">
-              <button class="diff-btn active" data-level="1">Easy</button>
-              <button class="diff-btn" data-level="2">Medium</button>
-              <button class="diff-btn" data-level="3">Hard</button>
-              <button class="diff-btn" data-level="4">Harder</button>
-              <button class="diff-btn" data-level="5">Hardest</button>
+          <div class="difficulty-row" id="difficulty-row">
+            <span class="difficulty-label" id="difficulty-label">Difficulty</span>
+            <div class="difficulty-btns" id="difficulty-btns" role="group" aria-labelledby="difficulty-label">
+              <button type="button" class="diff-btn active" data-level="1" aria-pressed="true">Easy</button>
+              <button type="button" class="diff-btn" data-level="2" aria-pressed="false">Medium</button>
+              <button type="button" class="diff-btn" data-level="3" aria-pressed="false">Hard</button>
+              <button type="button" class="diff-btn" data-level="4" aria-pressed="false">Harder</button>
+              <button type="button" class="diff-btn" data-level="5" aria-pressed="false">Hardest</button>
             </div>
           </div>
-          <button class="btn-generate" id="btn-generate">Generate Worksheet</button>
-          <p class="error-msg" id="error-msg"></p>
+          <button type="button" class="btn-generate" id="btn-generate">Generate Worksheet</button>
+          <p class="error-msg" id="error-msg" role="alert"></p>
         </div>
       </div>
     </aside>
