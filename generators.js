@@ -51,7 +51,7 @@ const DIFFICULTY_AWARE_TYPES = new Set([
   'sequence', 'fractionOfGroup', 'money', 'divisionRemainder', 'equivFractions',
   'fractionMultiply', 'fractionDivide', 'improperMixed', 'perimeter', 'volume',
   'primeComposite', 'factors', 'orderOfOps', 'ratio', 'negativeNumbers',
-  'algebraSubstitution', 'coordinates',
+  'algebraSubstitution', 'coordinates', 'wordProblem', 'mixedReview',
 ]);
 
 // ── Arithmetic ────────────────────────────────────────────────
@@ -1259,6 +1259,86 @@ function genAnalogClock(config) {
   };
 }
 
+// ── Word Problems ─────────────────────────────────────────────
+
+const WP_NAMES = ['Mia', 'Liam', 'Ava', 'Noah', 'Zoe', 'Kai', 'Ruby', 'Max', 'Ivy', 'Leo', 'Ella', 'Sam'];
+const WP_ITEMS = ['apples', 'stickers', 'marbles', 'pencils', 'trading cards', 'cookies', 'books', 'shells', 'coins', 'lollies'];
+const wpInline = (html, answer) => ({ layout: 'inline', html: `<span class="prob-text">${html}</span>`, answer: String(answer) });
+
+function genWordProblem(config) {
+  const { category = 'add-sub', difficulty = 1 } = config;
+  const name = randomChoice(WP_NAMES);
+  let other = randomChoice(WP_NAMES); while (other === name) other = randomChoice(WP_NAMES);
+  const item = randomChoice(WP_ITEMS);
+  const money = c => `$${(c / 100).toFixed(2)}`;
+
+  if (category === 'add-sub') {
+    const f = steep(difficulty);
+    const a = randomInt(5, Math.round(20 * f)), b = randomInt(3, Math.round(18 * f));
+    const t = randomInt(0, 2);
+    if (t === 0) return wpInline(`${name} had ${a} ${item} and then collected ${b} more. How many ${item} does ${name} have now?`, a + b);
+    const big = Math.max(a, b), small = Math.min(a, b);
+    if (t === 1) return wpInline(`${name} had ${big} ${item} and gave ${small} to ${other}. How many ${item} are left?`, big - small);
+    return wpInline(`${name} has ${big} ${item} and ${other} has ${small}. How many more does ${name} have?`, big - small);
+  }
+
+  if (category === 'mul-div') {
+    const g = gentle(difficulty);
+    const groups = randomInt(2, Math.round(6 * g)), per = randomInt(2, Math.round(9 * g));
+    if (Math.random() > 0.5) return wpInline(`There are ${groups} boxes with ${per} ${item} in each box. How many ${item} altogether?`, groups * per);
+    return wpInline(`${groups * per} ${item} are shared equally between ${groups} children. How many does each child get?`, per);
+  }
+
+  if (category === 'money') {
+    const f = gentle(difficulty);
+    if (Math.random() > 0.5) {
+      const unit = randomInt(2, Math.round(8 * f)) * 25; // cents, multiples of 25c
+      const qty = randomInt(2, 6);
+      return wpInline(`${name} buys ${qty} ${item} costing ${money(unit)} each. How much does ${name} pay in total?`, money(unit * qty));
+    }
+    const note = randomChoice([500, 1000, 2000, 5000].filter(n => n <= 1000 * f).concat([500]));
+    const price = randomInt(Math.floor(note * 0.2), Math.floor(note * 0.9) / 5 | 0) * 5 || 5;
+    return wpInline(`${name} buys a toy for ${money(price)} and pays with a ${money(note)} note. How much change does ${name} get?`, money(note - price));
+  }
+
+  if (category === 'multi-step') {
+    const f = gentle(difficulty);
+    const qty = randomInt(2, Math.round(5 * f)), unit = randomInt(2, Math.round(6 * f)) * 50; // cents
+    const extra = randomInt(1, Math.round(8 * f)) * 100;
+    if (Math.random() > 0.5) {
+      return wpInline(`${name} buys ${qty} ${item} at ${money(unit)} each and a book for ${money(extra)}. How much does ${name} spend altogether?`, money(qty * unit + extra));
+    }
+    const spend = qty * unit;
+    const start = spend + randomInt(1, Math.round(10 * f)) * 100; // guarantee non-negative remainder
+    return wpInline(`${name} has ${money(start)}. ${name} buys ${qty} ${item} at ${money(unit)} each. How much money is left?`, money(start - spend));
+  }
+
+  // fraction-pct
+  const f = gentle(difficulty);
+  if (Math.random() > 0.5) {
+    const denom = randomChoice([2, 3, 4, 5]);
+    const numer = randomInt(1, denom - 1);
+    const groups = randomInt(2, Math.round(8 * f));
+    const total = denom * groups;
+    return wpInline(`A class has ${total} students. ${frac(numer, denom)} of them play sport. How many students play sport?`, (numer * total) / denom);
+  }
+  const pct = randomChoice([10, 20, 25, 50]);
+  const total = randomInt(1, Math.round(10 * f)) * (100 / pct);
+  return wpInline(`${Math.round(total)} people were surveyed. ${pct}% said they like maths. How many people said they like maths?`, Math.round(total * pct / 100));
+}
+
+// ── Mixed Review ──────────────────────────────────────────────
+// Draws each problem from a random sibling topic (sources injected by curriculum.js).
+
+function genMixedReview(config) {
+  const { sources, difficulty = 1 } = config;
+  if (!sources || sources.length === 0) {
+    return { layout: 'inline', html: '<span class="prob-text">No review topics configured.</span>', answer: '' };
+  }
+  const src = randomChoice(sources);
+  return generateProblem(src.type, { ...src.config, difficulty });
+}
+
 // ── Dispatcher ────────────────────────────────────────────────
 
 function generateProblem(type, config) {
@@ -1297,6 +1377,8 @@ function generateProblem(type, config) {
     case 'triangleClassify':        return genTriangleClassify();
     case 'quadrilateralProperties': return genQuadrilateralProperties();
     case 'analogClock':             return genAnalogClock(config);
+    case 'wordProblem':             return genWordProblem(config);
+    case 'mixedReview':             return genMixedReview(config);
     default:
       return { layout: 'inline', html: '<span class="prob-text">Unknown problem type</span>', answer: '' };
   }

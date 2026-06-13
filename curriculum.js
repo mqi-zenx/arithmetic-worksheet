@@ -699,3 +699,38 @@ const CURRICULUM = [
     ],
   },
 ];
+
+// ── Word-problem topics (one themed set per year) ─────────────
+const WORD_PROBLEM_TOPICS = {
+  year2: { id: 'y2_word_addsub',    label: 'Word Problems: Add & Subtract',    category: 'add-sub',      defaultCount: 10 },
+  year3: { id: 'y3_word_muldiv',    label: 'Word Problems: Multiply & Divide', category: 'mul-div',      defaultCount: 10 },
+  year4: { id: 'y4_word_money',     label: 'Word Problems: Money',             category: 'money',        defaultCount: 10 },
+  year5: { id: 'y5_word_multistep', label: 'Word Problems: Multi-Step',        category: 'multi-step',   defaultCount: 8  },
+  year6: { id: 'y6_word_fracpct',   label: 'Word Problems: Fractions & %',     category: 'fraction-pct', defaultCount: 10 },
+};
+
+CURRICULUM.forEach(year => {
+  const wp = WORD_PROBLEM_TOPICS[year.id];
+  if (wp) {
+    year.topics.push({
+      id: wp.id, label: wp.label, type: 'wordProblem',
+      config: { category: wp.category }, defaultCount: wp.defaultCount,
+    });
+  }
+});
+
+// ── Mixed Review (samples that year's other topics) ───────────
+// Added last so it can reference every other topic in the year. Analog-clock
+// problems are excluded to keep a review sheet to a single text layout.
+CURRICULUM.forEach(year => {
+  const sources = year.topics
+    .filter(t => t.type !== 'analogClock')
+    .map(t => ({ type: t.type, config: t.config }));
+  year.topics.push({
+    id: `${year.id}_mixed`,
+    label: 'Mixed Review',
+    type: 'mixedReview',
+    config: { sources },
+    defaultCount: 20,
+  });
+});

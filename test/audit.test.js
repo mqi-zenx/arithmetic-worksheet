@@ -160,7 +160,8 @@ function verifyAnswer(topic, diff, p) {
 
   // 15. Negative answer only flagged where it should never occur
   //     (exclude the negative-numbers and algebra-substitution topics where negatives are valid).
-  if (/^-/.test(ans) && !/negative|algebra/i.test(topic)) {
+  // (Mixed Review can legitimately surface negative-number / algebra problems.)
+  if (/^-/.test(ans) && !/negative|algebra|mixed/i.test(topic)) {
     return fail(topic, diff, 'UNEXPECTED_NEGATIVE', `q="${q}" ans="${ans}"`);
   }
 }
@@ -197,7 +198,12 @@ const AWARE = sandbox.__api.DIFFICULTY_AWARE_TYPES || new Set();
 // These intentionally trade magnitude for complexity at higher levels
 // (mixed numbers, reverse %, word problems, compound shapes), so a drop in the
 // largest number is expected and must not be treated as an inversion bug.
-const TYPE_SWITCHERS = new Set(['fractionArithmetic', 'percentage', 'simpleEquations', 'area']);
+const TYPE_SWITCHERS = new Set([
+  'fractionArithmetic', 'percentage', 'simpleEquations', 'area',
+  // Composite / bounded-magnitude templated topics: correctness is verified
+  // elsewhere; their peak magnitude isn't a meaningful difficulty signal.
+  'wordProblem', 'mixedReview',
+]);
 const maxToken = (type, cfg, d) => {
   let mx = 0;
   for (let i = 0; i < 400; i++) {
